@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.4.0
+- `find_client`: locate a client by MAC(s), IP or name down to the switch port (classic `stat/sta` via the
+  Connector) or AP + SSID, falling back to the Integration API's uplink device. Hint-first search
+  (console/site), remembered locations, `groups` mapping in consoles.yaml, then the fleet.
+
 ## 0.3.0
 
 - UniFi Protect: `protect_list_cameras`, `protect_list_devices`, `protect_camera_snapshot`,

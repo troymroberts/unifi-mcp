@@ -25,6 +25,7 @@ An MCP server for managing UniFi deployments from Claude (or any MCP client).
 | `list_devices`, `get_device` | Adopted devices; one device's details plus latest statistics |
 | `list_pending_devices` | Devices waiting for adoption |
 | `list_clients`, `get_client` | Connected clients |
+| `find_client` | Where a machine is plugged in: console, site, **switch + port** (wired) or **AP + SSID** (wireless), by MAC(s), IP or name; searches a hint first, then remembered locations, `groups`-mapped consoles, then the fleet |
 | `list_site_config` | networks, wifi, firewall-policies/zones, acl-rules, dns-policies, wans, vpn-servers/tunnels, vouchers, radius-profiles, device-tags, LAGs, switch stacks, traffic-matching-lists |
 | `network_api_endpoints`, `network_api_describe` | Search the bundled Network API spec; show parameters and request body schema |
 | `network_api_request` | Call any Network API path (GET runs; other methods are gated writes) |
@@ -80,6 +81,22 @@ the client config. More consoles can be aliased in `~/.config/unifi-mcp/consoles
 | `UNIFI_SECRETS_FILE` | Key file (default `~/.config/unifi-mcp/secrets.env`) |
 | `UNIFI_DEFAULT_CONSOLE` | Console used when a call omits `console=` |
 | `UNIFI_TIMEOUT` | HTTP timeout in seconds (default 30) |
+
+## Finding a client: `find_client`
+
+`find_client(macs=[...], ip=, name=, console=, site=, group=, search_fleet=true)` returns every match with the
+console, site, client details and either `switch {name, model, mac, port, depth}` or
+`access_point {name, model, mac, ssid}`.
+
+- **Switch ports** come from the classic controller API (`/network/api/s/<site>/stat/sta`), which the api.ui.com
+  Connector proxies with the same Site Manager key. The official Integration API only gives a client's uplink
+  device, so if a console refuses the classic API the result falls back to that (switch/AP name, `port: null`).
+  The classic API is undocumented and could change.
+- **Search order**: the `console`/`site` hint (e.g. the last-seen site stored in an asset inventory), locations
+  found earlier in this session, consoles whose `consoles.yaml` entry lists `group` under `groups`, then every
+  owned, connected console (4 at a time). A hit in an earlier step skips the rest.
+- Only **currently connected** clients are listed by UniFi. Pass all of a machine's MACs (docks, Wi-Fi, USB NICs);
+  Windows may use a random per-network Wi-Fi MAC. `sw_depth` > 1 means the client sits behind another switch.
 
 ## Limits worth knowing
 

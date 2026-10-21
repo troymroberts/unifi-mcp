@@ -18,3 +18,6 @@ consoles:
     host: UniFi-OS-Server
   office:
     host: Office-UDM-Pro
+    # Optional: MeshCentral device groups (or any client labels) whose machines sit behind this
+    # console. find_client(group=...) searches these consoles before the rest of the fleet.
+    groups: [Bhagwansingh's Servers, Bhagwansingh Trincity PCs]

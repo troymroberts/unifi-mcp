@@ -22,6 +22,7 @@ MAX_RETRIES = 2
 NETWORK_PAGE_SIZE = 200
 SM_PAGE_SIZE = 100
 NETWORK_APP = "network/integration"
+NETWORK_LEGACY_APP = "network/api"  # classic controller API; the Connector proxies it with the same key
 PROTECT_APP = "protect/integration"
 PROTECT_INTERNAL_APP = "protect/api"
 

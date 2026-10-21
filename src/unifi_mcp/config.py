@@ -33,6 +33,9 @@ class ConsoleAlias:
     api_key_env: str | None = None
     verify_ssl: bool | str = True  # bool, or a CA bundle path
     host: str | None = None
+    # MeshCentral device-group names (or other client labels) whose machines sit behind
+    # this console; find_client searches these consoles first.
+    groups: tuple[str, ...] = ()
 
     @property
     def is_local(self) -> bool:
@@ -62,12 +65,18 @@ def _parse_alias(name: str, raw: Mapping) -> ConsoleAlias:
         verify = str(Path(raw["ca_file"]).expanduser())
     if local_url and not raw.get("api_key_env"):
         raise ConfigError(f"console '{name}': local consoles need api_key_env")
+    groups = raw.get("groups") or ()
+    if isinstance(groups, str):
+        groups = (groups,)
+    if not isinstance(groups, (list, tuple)) or not all(isinstance(g, str) for g in groups):
+        raise ConfigError(f"console '{name}': groups must be a list of names")
     return ConsoleAlias(
         name=name,
         local_url=str(local_url).rstrip("/") if local_url else None,
         api_key_env=raw.get("api_key_env"),
         verify_ssl=verify,
         host=str(host) if host else None,
+        groups=tuple(g.strip() for g in groups if g.strip()),
     )
 
 
