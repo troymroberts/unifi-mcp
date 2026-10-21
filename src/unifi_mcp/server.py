@@ -15,6 +15,7 @@ from mcp.types import ToolAnnotations
 from . import protect, spec
 from .client import NETWORK_APP, HttpBackend, NetworkAPI, NetworkTarget, SiteManagerAPI, UniFiAPIError
 from .config import ConfigError, Settings, load_secrets_file, load_settings
+from .locate import ClientLocator
 from .resolve import Resolver, ResolveError, host_name
 
 READ = ToolAnnotations(read_only_hint=True, open_world_hint=True)
@@ -51,6 +52,7 @@ UniFi fleet + Network API access.
 - Per console: pass console= as a consoles.yaml alias (e.g. 'home'), a console hostname (partial is fine if
   unique) or a Site Manager host id. Cloud consoles go through the Connector; local aliases go direct.
 - site= accepts a site name, internal reference or id; omit it when the console has one site.
+- Where is a machine plugged in? find_client(macs=[...], console=/site= hint, group=) -> site + switch/port or AP.
 - Anything not covered by a curated tool: network_api_endpoints -> network_api_describe -> network_api_request.
 - Protect (cameras/NVR): protect_list_cameras, protect_list_devices, protect_camera_snapshot, protect_events,
   protect_license_plates, protect_api_request. Events and plates use Protect's internal API (cloud Connector).
@@ -186,7 +188,8 @@ def create_server(settings: Settings | None = None, transport: httpx.AsyncBaseTr
     sm = SiteManagerAPI(backend, settings.sm_api_key, settings.cloud_base_url)
     network = NetworkAPI(backend)
     resolver = Resolver(settings, sm, network)
-    mcp = MCPServer("unifi", instructions=INSTRUCTIONS, version="0.3.0")
+    locator = ClientLocator(settings, resolver, network)
+    mcp = MCPServer("unifi", instructions=INSTRUCTIONS, version="0.4.0")
 
     async def fleet() -> tuple[list[dict], list[dict], dict[str, dict]]:
         hosts = await resolver.hosts()
@@ -375,6 +378,23 @@ def create_server(settings: Settings | None = None, transport: httpx.AsyncBaseTr
         """Details for one connected client."""
         target, site_id = await target_and_site(console, site)
         return await network.request(target, "GET", f"/v1/sites/{site_id}/clients/{client_id}")
+
+    @mcp.tool(annotations=READ)
+    @_guard
+    async def find_client(
+        macs: list[str] | None = None, ip: str | None = None, name: str | None = None,
+        console: str | None = None, site: str | None = None, group: str | None = None,
+        search_fleet: bool = True,
+    ) -> dict[str, Any]:
+        """Find where a client is connected: console, site, and the switch + port (wired) or AP + SSID
+        (wireless). Match by any of macs (all of a machine's NICs; any format), ip or name.
+        console/site are a hint (e.g. the last-seen site from an inventory) and are searched first,
+        then locations remembered this session, then consoles whose consoles.yaml `groups` list
+        `group` (e.g. the MeshCentral device group), then the whole fleet unless search_fleet=false.
+        Only currently connected clients are found. Switch ports come from the classic controller API
+        through the Connector; if a console refuses it, the Integration API gives the uplink device only."""
+        return await locator.find(macs=macs, ip=ip, name=name, console=console, site=site, group=group,
+                                  search_fleet=search_fleet)
 
     @mcp.tool(annotations=READ)
     @_guard

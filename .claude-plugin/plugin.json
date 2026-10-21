@@ -1,6 +1,6 @@
 {
   "name": "unifi",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "UniFi fleet, Network and Protect tools: Site Manager view of every console, per-console control via the cloud Connector or a local console. Read-only unless writes are enabled.",
   "author": { "name": "Troy Roberts" },
   "homepage": "https://github.com/troymroberts/unifi-mcp",
