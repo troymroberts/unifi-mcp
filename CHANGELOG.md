@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.5.0
+- `list_fixed_ips`: DHCP reservations (fixed IPs) and aliases on a site, from the classic `rest/user` + `rest/networkconf`
+  (the Integration API does not expose them).
+- `set_client_reservations`: set fixed IPs and/or aliases for many clients in one call (create the client record when the
+  MAC is unknown). Validates the whole batch first (IP in the network's subnet, not gateway/broadcast, not reserved for
+  another MAC, no duplicates) and writes nothing if any item fails; dry-run plan until `confirm=true`, needs
+  `UNIFI_ALLOW_WRITES=true`. Fixed IPs may sit outside the DHCP range (verified on UniFi OS Server 5.1).
+
 ## 0.4.0
 - `find_client`: locate a client by MAC(s), IP or name down to the switch port (classic `stat/sta` via the
   Connector) or AP + SSID, falling back to the Integration API's uplink device. Hint-first search
