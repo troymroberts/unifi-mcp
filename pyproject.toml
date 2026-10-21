@@ -1,0 +1,31 @@
+[project]
+name = "unifi-mcp"
+version = "0.1.0"
+description = "MCP server for UniFi: Site Manager fleet view plus per-console Network API via the cloud Connector or a local console"
+readme = "README.md"
+authors = [
+    { name = "Troy Roberts", email = "troy.roberts@paxgenesis.com" }
+]
+requires-python = ">=3.12"
+dependencies = [
+    "httpx>=0.28.1",
+    "mcp>=1.9",
+    "pyyaml>=6.0.3",
+]
+
+[project.scripts]
+unifi-mcp = "unifi_mcp:main"
+
+[build-system]
+requires = ["uv_build>=0.11.11,<0.12.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+    "pytest-asyncio>=1.4.0",
+]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]

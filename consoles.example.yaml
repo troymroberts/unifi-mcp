@@ -1,0 +1,20 @@
+# Copy to ~/.config/unifi-mcp/consoles.yaml (or point UNIFI_CONSOLES_FILE at it).
+# Keys never go in this file: local consoles name the env var that holds theirs.
+
+# Used when a tool call omits console=. May be an alias below or a console hostname.
+default: home
+
+consoles:
+  # Direct on the LAN with a local Network API key
+  # (UniFi Network > Settings > Control Plane > Integrations).
+  home:
+    local_url: https://192.168.1.1
+    api_key_env: UNIFI_HOME_API_KEY
+    verify_ssl: false          # consoles ship self-signed certs; or set ca_file: /path/to/ca.pem
+
+  # Short names for cloud consoles, reached through the api.ui.com Connector
+  # with UNIFI_SM_API_KEY. host = Site Manager hostname or host id.
+  server:
+    host: UniFi-OS-Server
+  office:
+    host: Office-UDM-Pro
