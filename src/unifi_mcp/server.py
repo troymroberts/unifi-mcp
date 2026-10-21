@@ -16,6 +16,7 @@ from . import protect, spec
 from .client import NETWORK_APP, HttpBackend, NetworkAPI, NetworkTarget, SiteManagerAPI, UniFiAPIError
 from .config import ConfigError, Settings, load_secrets_file, load_settings
 from .locate import ClientLocator
+from .reservations import Reservations
 from .resolve import Resolver, ResolveError, host_name
 
 READ = ToolAnnotations(read_only_hint=True, open_world_hint=True)
@@ -189,7 +190,8 @@ def create_server(settings: Settings | None = None, transport: httpx.AsyncBaseTr
     network = NetworkAPI(backend)
     resolver = Resolver(settings, sm, network)
     locator = ClientLocator(settings, resolver, network)
-    mcp = MCPServer("unifi", instructions=INSTRUCTIONS, version="0.4.0")
+    reservations = Reservations(settings, resolver, network)
+    mcp = MCPServer("unifi", instructions=INSTRUCTIONS, version="0.5.0")
 
     async def fleet() -> tuple[list[dict], list[dict], dict[str, dict]]:
         hosts = await resolver.hosts()
@@ -395,6 +397,30 @@ def create_server(settings: Settings | None = None, transport: httpx.AsyncBaseTr
         through the Connector; if a console refuses it, the Integration API gives the uplink device only."""
         return await locator.find(macs=macs, ip=ip, name=name, console=console, site=site, group=group,
                                   search_fleet=search_fleet)
+
+    @mcp.tool(annotations=READ)
+    @_guard
+    async def list_fixed_ips(console: str | None = None, site: str | None = None, network: str | None = None,
+                             include_names: bool = False) -> dict[str, Any]:
+        """DHCP reservations (fixed IPs) on a site: MAC, alias, hostname, fixed IP, network. network= limits
+        to one network (name, VLAN id or id); include_names=true also lists clients that only have an alias.
+        Uses the classic controller API (the Integration API does not expose fixed IPs)."""
+        return await reservations.list_fixed(console, site, network, include_names)
+
+    @mcp.tool(annotations=WRITE)
+    @_guard
+    async def set_client_reservations(
+        items: list[dict[str, Any]], console: str | None = None, site: str | None = None,
+        network: str | None = None, confirm: bool = False,
+    ) -> dict[str, Any]:
+        """Set DHCP reservations (fixed IPs) and/or aliases for many clients in one call: items =
+        [{"mac": "...", "ip": "10.1.1.20", "name": "Lane 3"}, ...] (ip and name each optional;
+        "clear_fixed_ip": true removes a reservation). The network is the one whose subnet holds the IP,
+        or network=. A fixed IP may lie outside the DHCP range. Checks every item first (valid IP in the
+        subnet, not gateway/broadcast, not reserved for another MAC, no duplicates) and writes nothing if
+        any item fails. Returns a plan (dry run) until confirm=true; needs UNIFI_ALLOW_WRITES=true to apply.
+        Clients pick up a new fixed IP at their next DHCP request."""
+        return await reservations.set_many(items, console, site, network, confirm)
 
     @mcp.tool(annotations=READ)
     @_guard
