@@ -63,7 +63,7 @@ class Resolver:
             raise ResolveError(f"console '{alias.name}': environment variable {alias.api_key_env} is not set")
         return NetworkTarget(
             label=alias.name,
-            base_url=f"{alias.local_url}/proxy/network/integration",
+            root=f"{alias.local_url}/proxy",
             api_key=key,
             via="local",
             verify=alias.verify_ssl,
@@ -77,7 +77,7 @@ class Resolver:
             raise ResolveError(f"console '{host_name(host)}' is {state}; the Connector only reaches connected consoles")
         return NetworkTarget(
             label=host_name(host),
-            base_url=f"{self.settings.cloud_base_url}/v1/connector/consoles/{host['id']}/network/integration",
+            root=f"{self.settings.cloud_base_url}/v1/connector/consoles/{host['id']}",
             api_key=self.settings.sm_api_key,
             via="cloud",
             host_id=host["id"],

@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.3.0
+
+- UniFi Protect: `protect_list_cameras`, `protect_list_devices`, `protect_camera_snapshot`,
+  `protect_events`, `protect_license_plates`, `protect_api_request`.
+- Event and plate history read Protect's internal API through the Connector, windowed by day or hours
+  in the NVR's own timezone.
+- Protect writes use the same gate as Network writes (flag + dry-run + `confirm=true`).
+
 ## 0.2.0
 
 - Installable as a Claude Code plugin (`/plugin install unifi --marketplace troymroberts/unifi-mcp`);

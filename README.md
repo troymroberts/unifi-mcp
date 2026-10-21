@@ -29,6 +29,12 @@ An MCP server for managing UniFi deployments from Claude (or any MCP client).
 | `network_api_endpoints`, `network_api_describe` | Search the bundled Network API spec; show parameters and request body schema |
 | `network_api_request` | Call any Network API path (GET runs; other methods are gated writes) |
 | `restart_device`, `power_cycle_port`, `set_guest_access`, `create_vouchers` | Curated writes (only with `UNIFI_ALLOW_WRITES=true`) |
+| `protect_list_cameras` | Protect cameras with state and which smart detections (incl. license plates) are supported/enabled |
+| `protect_list_devices` | NVRs, sensors, lights, chimes, viewers, liveviews, sirens, relays, alarm hubs, users, ... |
+| `protect_camera_snapshot` | Current still image from a camera |
+| `protect_events` | Event history (motion, smart detections, rings, ...) for a day or the last N hours, in the NVR's timezone |
+| `protect_license_plates` | Plates read by LPR cameras for a day or window: per-plate sightings plus every detection |
+| `protect_api_request` | Any official Protect API path (writes gated) or a read-only internal Protect path |
 
 `console=` accepts a `consoles.yaml` alias, a console hostname (a unique partial match is fine) or a
 Site Manager host id. `site=` accepts a site name, internal reference or id, and can be omitted when
@@ -76,6 +82,11 @@ the client config. More consoles can be aliased in `~/.config/unifi-mcp/consoles
 | `UNIFI_TIMEOUT` | HTTP timeout in seconds (default 30) |
 
 ## Limits worth knowing
+
+- Protect's official API has no event history, so `protect_events` and `protect_license_plates`
+  read Protect's internal API (`/protect/api/events`). The cloud Connector forwards it with the
+  Site Manager key; it is undocumented and can change between Protect versions. Plate text and
+  sightings are personal data: use them within the monitoring scope agreed for each site.
 
 - Connector: 100 requests/minute per console (the client paces itself and retries 429s),
   25 s per request, 10 MB per response. A console that does not answer in time returns

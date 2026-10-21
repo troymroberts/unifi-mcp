@@ -12,8 +12,8 @@ from mcp.server.mcpserver import MCPServer
 from mcp.server.mcpserver.exceptions import ToolError
 from mcp.types import ToolAnnotations
 
-from . import spec
-from .client import HttpBackend, NetworkAPI, NetworkTarget, SiteManagerAPI, UniFiAPIError
+from . import protect, spec
+from .client import NETWORK_APP, HttpBackend, NetworkAPI, NetworkTarget, SiteManagerAPI, UniFiAPIError
 from .config import ConfigError, Settings, load_secrets_file, load_settings
 from .resolve import Resolver, ResolveError, host_name
 
@@ -52,6 +52,8 @@ UniFi fleet + Network API access.
   unique) or a Site Manager host id. Cloud consoles go through the Connector; local aliases go direct.
 - site= accepts a site name, internal reference or id; omit it when the console has one site.
 - Anything not covered by a curated tool: network_api_endpoints -> network_api_describe -> network_api_request.
+- Protect (cameras/NVR): protect_list_cameras, protect_list_devices, protect_camera_snapshot, protect_events,
+  protect_license_plates, protect_api_request. Events and plates use Protect's internal API (cloud Connector).
 - Writes are only available when the server runs with UNIFI_ALLOW_WRITES=true, and every write first returns
   a dry-run preview; repeat the call with confirm=true only after the user agrees.
 """
@@ -184,7 +186,7 @@ def create_server(settings: Settings | None = None, transport: httpx.AsyncBaseTr
     sm = SiteManagerAPI(backend, settings.sm_api_key, settings.cloud_base_url)
     network = NetworkAPI(backend)
     resolver = Resolver(settings, sm, network)
-    mcp = MCPServer("unifi", instructions=INSTRUCTIONS, version="0.2.0")
+    mcp = MCPServer("unifi", instructions=INSTRUCTIONS, version="0.3.0")
 
     async def fleet() -> tuple[list[dict], list[dict], dict[str, dict]]:
         hosts = await resolver.hosts()
@@ -403,16 +405,19 @@ def create_server(settings: Settings | None = None, transport: httpx.AsyncBaseTr
         return spec.describe(method, path)
 
     async def execute_write(target: NetworkTarget, method: str, path: str, body: Any,
-                            confirm: bool, params: dict[str, Any] | None = None) -> dict[str, Any]:
+                            confirm: bool, params: dict[str, Any] | None = None,
+                            app: str = NETWORK_APP) -> dict[str, Any]:
         if not settings.allow_writes:
             raise ToolError("writes are disabled; restart the server with UNIFI_ALLOW_WRITES=true")
-        preview = {"console": target.label, "via": target.via, "method": method, "path": path,
+        preview = {"console": target.label, "via": target.via, "app": app, "method": method, "path": path,
                    "query": params or None, "body": body}
         if not confirm:
             return {"dry_run": True, **preview,
                     "next": "Show this to the user; re-run the same call with confirm=true to execute."}
-        result = await network.request(target, method, path, params=params, body=body)
+        result = await network.request(target, method, path, params=params, body=body, app=app)
         return {"executed": True, **preview, "result": result}
+
+    protect.register(mcp, settings, resolver, network, execute_write, _guard)
 
     @mcp.tool(annotations=WRITE)
     @_guard

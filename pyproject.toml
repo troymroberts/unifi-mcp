@@ -1,6 +1,6 @@
 [project]
 name = "unifi-mcp"
-version = "0.2.0"
+version = "0.3.0"
 description = "MCP server for UniFi: Site Manager fleet view plus per-console Network API via the cloud Connector or a local console"
 readme = "README.md"
 authors = [

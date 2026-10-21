@@ -21,6 +21,9 @@ RETRY_AFTER_RE = re.compile(r"retry after ([\d.]+)s")
 MAX_RETRIES = 2
 NETWORK_PAGE_SIZE = 200
 SM_PAGE_SIZE = 100
+NETWORK_APP = "network/integration"
+PROTECT_APP = "protect/integration"
+PROTECT_INTERNAL_APP = "protect/api"
 
 
 class UniFiAPIError(Exception):
@@ -36,15 +39,22 @@ class NetworkTarget:
     """Where a console's Network Integration API lives and how to authenticate."""
 
     label: str
-    base_url: str  # ends in /network/integration
+    root: str  # .../v1/connector/consoles/{id} (cloud) or https://<console>/proxy (local)
     api_key: str
     via: str  # "cloud" or "local"
     verify: bool | str = True
     host_id: str | None = None
 
     @property
+    def base_url(self) -> str:
+        return f"{self.root}/{NETWORK_APP}"
+
+    def url(self, app: str, path: str) -> str:
+        return f"{self.root}/{app}{path}"
+
+    @property
     def limiter_key(self) -> str:
-        return self.host_id or self.base_url
+        return self.host_id or self.root
 
 
 class RateLimiter:
@@ -117,8 +127,9 @@ class HttpBackend:
         json: Any = None,
         verify: bool | str = True,
         limiter_key: str | None = None,
+        raw: bool = False,
     ) -> Any:
-        headers = {"X-API-Key": api_key, "Accept": "application/json"}
+        headers = {"X-API-Key": api_key, "Accept": "*/*" if raw else "application/json"}
         params = {k: v for k, v in (params or {}).items() if v is not None}
         for attempt in range(MAX_RETRIES + 1):
             if limiter_key:
@@ -129,6 +140,8 @@ class HttpBackend:
                 continue
             if resp.status_code >= 400:
                 raise _error_from_response(resp)
+            if raw:
+                return resp.content, resp.headers.get("content-type", "")
             if resp.status_code == 204 or not resp.content:
                 return None
             try:
@@ -174,6 +187,8 @@ class SiteManagerAPI:
 
 
 class NetworkAPI:
+    """Console-side APIs (Network, and Protect via ``app=``) on a resolved target."""
+
     def __init__(self, backend: HttpBackend):
         self.backend = backend
 
@@ -185,15 +200,18 @@ class NetworkAPI:
         *,
         params: dict[str, Any] | None = None,
         body: Any = None,
+        app: str = NETWORK_APP,
+        raw: bool = False,
     ) -> Any:
         return await self.backend.request(
             method.upper(),
-            f"{target.base_url}{path}",
+            target.url(app, path),
             target.api_key,
             params=params,
             json=body,
             verify=target.verify,
             limiter_key=target.limiter_key,
+            raw=raw,
         )
 
     async def get_page(

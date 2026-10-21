@@ -72,7 +72,9 @@ def server(fake, **overrides):
 
 async def call(srv, name, **args):
     result = await srv.call_tool(name, args)
-    content = result.structured_content or {}
+    if result.structured_content is None:  # tools typed Any return JSON text only
+        return json.loads(result.content[0].text)
+    content = result.structured_content
     # Non-dict return values are wrapped by the SDK as {"result": ...}.
     return content["result"] if set(content) == {"result"} else content
 
