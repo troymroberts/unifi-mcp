@@ -31,6 +31,8 @@ An MCP server for managing UniFi deployments from Claude (or any MCP client).
 | `device_health` | Per device: CPU/RAM/temp/uptime; **switch** port errors/drops, STP-blocking, PoE faults; **AP** per-radio airtime, external interference, TX-retry %, client count; `problems_only` |
 | `site_health` | Per subsystem (wan/www/wlan/lan): WAN latency and packet drops, throughput, device/client counts |
 | `client_app_usage` | Per-client **DPI** application/category traffic by bytes, tied to the client (for auditing "which client used the most <app>"; data volume, not time) |
+| `list_fixed_ips` | DHCP reservations (fixed IPs) and aliases on a site (classic controller API) |
+| `set_client_reservations` | **Write**: fixed IPs and/or aliases for many clients at once; whole batch validated first; dry-run until `confirm=true` |
 | `list_site_config` | networks, wifi, firewall-policies/zones, acl-rules, dns-policies, wans, vpn-servers/tunnels, vouchers, radius-profiles, device-tags, LAGs, switch stacks, traffic-matching-lists |
 | `network_api_endpoints`, `network_api_describe` | Search the bundled Network API spec; show parameters and request body schema |
 | `network_api_request` | Call any Network API path (GET runs; other methods are gated writes) |
@@ -86,6 +88,16 @@ the client config. More consoles can be aliased in `~/.config/unifi-mcp/consoles
 | `UNIFI_SECRETS_FILE` | Key file (default `~/.config/unifi-mcp/secrets.env`) |
 | `UNIFI_DEFAULT_CONSOLE` | Console used when a call omits `console=` |
 | `UNIFI_TIMEOUT` | HTTP timeout in seconds (default 30) |
+
+## Reservations and names: `list_fixed_ips`, `set_client_reservations`
+
+The Integration API cannot read or set a client's fixed IP or alias, so these use the classic `rest/user` and
+`rest/networkconf` routes through the Connector (like `find_client`). `set_client_reservations(items=[{"mac": "...",
+"ip": "10.1.1.20", "name": "Lane 3"}, ...])` picks the network whose subnet holds each IP (or `network=`), checks the
+whole batch (IP inside the subnet, not the gateway/broadcast, not reserved for another MAC, no duplicate IPs or MACs)
+and writes nothing if any item fails. It returns the plan as a dry run until `confirm=true`, and needs
+`UNIFI_ALLOW_WRITES=true`. `"clear_fixed_ip": true` removes a reservation. A fixed IP may lie outside the DHCP range;
+clients pick it up at their next DHCP request.
 
 ## Finding a client: `find_client`
 

@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.7.0
+Client DHCP reservations and aliases (classic `rest/user` via the Connector; the Integration API has no
+fixed-IP or client-name write). Originally the 0.5.0 `feat/client-reservations` branch, rebased onto 0.6.2.
+- `list_fixed_ips`: DHCP reservations (fixed IPs) and aliases on a site, from the classic `rest/user` + `rest/networkconf`
+  (the Integration API does not expose them).
+- `set_client_reservations`: set fixed IPs and/or aliases for many clients in one call (create the client record when the
+  MAC is unknown). Validates the whole batch first (IP in the network's subnet, not gateway/broadcast, not reserved for
+  another MAC, not leased right now to another connected device, no duplicates) and writes nothing if any item fails; dry-run plan until `confirm=true`, needs
+  `UNIFI_ALLOW_WRITES=true`. Fixed IPs may sit outside the DHCP range (verified on UniFi OS Server 5.1).
+
 ## 0.6.2
 - `device_health`: SFP/SFP+ DDM optics. A flagged SFP port now carries an `sfp` block (rx/tx optical
   power, temperature, vendor, whatever `sfp*` fields the firmware reports); `include_sfp=true` adds every
