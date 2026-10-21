@@ -14,7 +14,7 @@ from mcp.types import ToolAnnotations
 
 from . import spec
 from .client import HttpBackend, NetworkAPI, NetworkTarget, SiteManagerAPI, UniFiAPIError
-from .config import ConfigError, Settings, load_settings
+from .config import ConfigError, Settings, load_secrets_file, load_settings
 from .resolve import Resolver, ResolveError, host_name
 
 READ = ToolAnnotations(read_only_hint=True, open_world_hint=True)
@@ -501,4 +501,6 @@ def create_server(settings: Settings | None = None, transport: httpx.AsyncBaseTr
 def main() -> None:
     # httpx logs every request URL at INFO; keep stderr quiet unless something is wrong.
     logging.getLogger("httpx").setLevel(logging.WARNING)
+    for warning in load_secrets_file():
+        logging.getLogger(__name__).warning(warning)
     create_server().run()

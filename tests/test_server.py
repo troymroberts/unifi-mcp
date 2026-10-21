@@ -180,3 +180,15 @@ def test_spec_search_and_describe():
     assert any(op["path"] == "/v1/sites/{siteId}/firewall/policies" for op in spec.search("firewall policies"))
     described = spec.describe("POST", "/v1/sites/{siteId}/hotspot/vouchers")
     assert "timeLimitMinutes" in described["requestBody"]["required"]
+
+
+def test_secrets_file_fills_env_without_overriding(tmp_path):
+    from unifi_mcp.config import load_secrets_file
+
+    secrets = tmp_path / "secrets.env"
+    secrets.write_text("# keys\nUNIFI_SM_API_KEY='from-file'\nexport UNIFI_HOME_API_KEY=local\nUNIFI_TIMEOUT=10\n")
+    secrets.chmod(0o644)
+    env = {"UNIFI_TIMEOUT": "60"}
+    warnings = load_secrets_file(secrets, env)
+    assert env == {"UNIFI_TIMEOUT": "60", "UNIFI_SM_API_KEY": "from-file", "UNIFI_HOME_API_KEY": "local"}
+    assert warnings and "chmod 600" in warnings[0]

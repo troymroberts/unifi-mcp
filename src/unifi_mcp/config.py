@@ -9,7 +9,9 @@ from typing import Mapping
 
 import yaml
 
-DEFAULT_CONSOLES_FILE = Path.home() / ".config" / "unifi-mcp" / "consoles.yaml"
+CONFIG_DIR = Path.home() / ".config" / "unifi-mcp"
+DEFAULT_CONSOLES_FILE = CONFIG_DIR / "consoles.yaml"
+DEFAULT_SECRETS_FILE = CONFIG_DIR / "secrets.env"
 TRUTHY = {"1", "true", "yes", "on"}
 
 
@@ -80,6 +82,27 @@ def load_consoles_file(path: Path) -> tuple[dict[str, ConsoleAlias], str | None]
         # A default may also be a hostname/host id resolved later via Site Manager.
         return aliases, str(default)
     return aliases, default.lower() if default else None
+
+
+def load_secrets_file(path: Path | None = None, env: dict[str, str] | None = None) -> list[str]:
+    """Load KEY=VALUE lines into ``env`` (default os.environ) without overriding what is set.
+
+    Keeps API keys out of MCP client configs such as ~/.claude.json. Returns warnings.
+    """
+    env = os.environ if env is None else env
+    path = Path(path or env.get("UNIFI_SECRETS_FILE") or DEFAULT_SECRETS_FILE).expanduser()
+    if not path.exists():
+        return []
+    warnings = []
+    if path.stat().st_mode & 0o077:
+        warnings.append(f"{path} is readable by other users; run: chmod 600 {path}")
+    for line in path.read_text().splitlines():
+        line = line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, value = line.removeprefix("export ").split("=", 1)
+        env.setdefault(key.strip(), value.strip().strip("'\""))
+    return warnings
 
 
 def load_settings(env: Mapping[str, str] | None = None) -> Settings:
