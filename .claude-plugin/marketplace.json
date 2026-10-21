@@ -1,0 +1,11 @@
+{
+  "name": "unifi-mcp",
+  "owner": { "name": "Troy Roberts" },
+  "plugins": [
+    {
+      "name": "unifi",
+      "source": "./",
+      "description": "UniFi fleet + Network API MCP server (Site Manager, cloud Connector, local consoles)"
+    }
+  ]
+}

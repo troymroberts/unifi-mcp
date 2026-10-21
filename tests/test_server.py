@@ -192,3 +192,23 @@ def test_secrets_file_fills_env_without_overriding(tmp_path):
     warnings = load_secrets_file(secrets, env)
     assert env == {"UNIFI_TIMEOUT": "60", "UNIFI_SM_API_KEY": "from-file", "UNIFI_HOME_API_KEY": "local"}
     assert warnings and "chmod 600" in warnings[0]
+
+
+async def test_local_console_from_env_and_blank_plugin_values(fake, monkeypatch):
+    env = {
+        "UNIFI_CONSOLES_FILE": "/nonexistent",
+        "UNIFI_SM_API_KEY": "sm-key",
+        "UNIFI_LOCAL_URL": "https://10.0.0.1/",
+        "UNIFI_LOCAL_API_KEY": "local-key",
+        "UNIFI_ALLOW_WRITES": "false",
+        "UNIFI_DEFAULT_CONSOLE": "",
+        "UNIFI_TIMEOUT": "${user_config.timeout}",
+    }
+    monkeypatch.setenv("UNIFI_LOCAL_API_KEY", "local-key")
+    settings = load_settings(env)
+    assert settings.default_console is None and settings.timeout == 30 and not settings.allow_writes
+    home = settings.aliases["home"]
+    assert home.local_url == "https://10.0.0.1" and home.verify_ssl is False
+    srv = create_server(settings, transport=httpx.MockTransport(fake))
+    await call(srv, "list_sites", console="home")
+    assert str(fake.requests[-1].url).startswith("https://10.0.0.1/proxy/network/integration/v1/sites")

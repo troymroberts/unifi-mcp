@@ -35,33 +35,45 @@ Site Manager host id. `site=` accepts a site name, internal reference or id, and
 the console has a single site. List filters use the Network API filter syntax, e.g.
 `state.eq('OFFLINE')`.
 
-## Setup
+## Install (Claude Code plugin — recommended)
 
-1. **Site Manager key**: unifi.ui.com > API > Create API Key. A personal key reaches only the
-   consoles you own; an **organization key** reaches every console in the organization.
-2. **Local key** (optional, for consoles you reach on the LAN): UniFi Network > Settings >
-   Control Plane > Integrations.
-3. **Aliases** (optional): copy `consoles.example.yaml` to `~/.config/unifi-mcp/consoles.yaml`.
+In a Claude Code session:
+
+```
+/plugin install unifi --marketplace troymroberts/unifi-mcp
+```
+
+(or `/plugin marketplace add troymroberts/unifi-mcp` then `/plugin install unifi@unifi-mcp` on older
+versions). Claude Code prompts for the settings below when the plugin is enabled; keys are masked and
+kept in its secure credential store, not in plain-text config. Change them later under `/plugin` >
+Installed > unifi > Configure options. Requires [uv](https://docs.astral.sh/uv/) on your PATH.
+
+| Prompt | Notes |
+|---|---|
+| Site Manager API key | unifi.ui.com > API. A personal key reaches only the consoles you own; an **organization key** reaches every console in the organization. |
+| Allow changes | Off by default. Exposes write tools; each write still needs `confirm=true`. |
+| Local console URL / API key | Optional, for a console reached on the LAN (UniFi Network > Settings > Control Plane > Integrations). Available as `console="home"`. |
+| Default console | Optional; used when a call omits `console=`. |
+
+## Manual setup (any MCP client)
+
+```bash
+claude mcp add unifi --scope user -- uv run --directory /path/to/unifi-mcp unifi-mcp
+```
+
+Put keys in `~/.config/unifi-mcp/secrets.env` (`chmod 600`), one `KEY=value` per line, rather than in
+the client config. More consoles can be aliased in `~/.config/unifi-mcp/consoles.yaml`
+(see `consoles.example.yaml`).
 
 | Variable | Purpose |
 |---|---|
 | `UNIFI_SM_API_KEY` | Site Manager key (fleet tools and Connector access) |
 | `UNIFI_ALLOW_WRITES` | `true` to expose write tools (default off) |
+| `UNIFI_LOCAL_URL`, `UNIFI_LOCAL_API_KEY` | One local console, available as `home` (`UNIFI_LOCAL_NAME` renames it; `UNIFI_LOCAL_VERIFY_SSL=true` to verify its certificate) |
 | `UNIFI_CONSOLES_FILE` | Alias file (default `~/.config/unifi-mcp/consoles.yaml`) |
-| `UNIFI_DEFAULT_CONSOLE` | Console used when a call omits `console=` (overrides the file's `default`) |
+| `UNIFI_SECRETS_FILE` | Key file (default `~/.config/unifi-mcp/secrets.env`) |
+| `UNIFI_DEFAULT_CONSOLE` | Console used when a call omits `console=` |
 | `UNIFI_TIMEOUT` | HTTP timeout in seconds (default 30) |
-| *your choice* | Local console keys, named by `api_key_env` in `consoles.yaml` |
-
-### Claude Code
-
-```bash
-claude mcp add unifi --scope user \
-  -e UNIFI_SM_API_KEY=<site-manager-key> \
-  -e UNIFI_HOME_API_KEY=<local-key> \
-  -- uv run --directory /mnt/d/git/unifi-mcp unifi-mcp
-```
-
-Add `-e UNIFI_ALLOW_WRITES=true` when you want write tools.
 
 ## Limits worth knowing
 

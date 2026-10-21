@@ -1,0 +1,56 @@
+{
+  "name": "unifi",
+  "version": "0.2.0",
+  "description": "UniFi fleet + Network API tools: Site Manager view of every console, per-console control via the cloud Connector or a local console. Read-only unless writes are enabled.",
+  "author": { "name": "Troy Roberts" },
+  "homepage": "https://github.com/troymroberts/unifi-mcp",
+  "repository": "https://github.com/troymroberts/unifi-mcp",
+  "keywords": ["unifi", "ubiquiti", "network", "mcp"],
+  "userConfig": {
+    "sm_api_key": {
+      "type": "string",
+      "title": "Site Manager API key",
+      "description": "From unifi.ui.com > API. An organization key reaches every console in the organization; a personal key only reaches consoles you own.",
+      "required": true,
+      "sensitive": true
+    },
+    "allow_writes": {
+      "type": "boolean",
+      "title": "Allow changes",
+      "description": "Expose write tools (restart devices, PoE cycle, guest access, vouchers, non-GET API calls). Every write still needs confirm=true.",
+      "default": false
+    },
+    "local_url": {
+      "type": "string",
+      "title": "Local console URL (optional)",
+      "description": "Console reached directly on the LAN, e.g. https://192.168.1.1. Available as console='home'. Leave blank for cloud only.",
+      "default": ""
+    },
+    "local_api_key": {
+      "type": "string",
+      "title": "Local console API key (optional)",
+      "description": "UniFi Network > Settings > Control Plane > Integrations on that console.",
+      "default": "",
+      "sensitive": true
+    },
+    "default_console": {
+      "type": "string",
+      "title": "Default console (optional)",
+      "description": "Console used when a tool call omits console=, e.g. home or a console hostname.",
+      "default": ""
+    }
+  },
+  "mcpServers": {
+    "unifi": {
+      "command": "uv",
+      "args": ["run", "--quiet", "--directory", "${CLAUDE_PLUGIN_ROOT}", "unifi-mcp"],
+      "env": {
+        "UNIFI_SM_API_KEY": "${user_config.sm_api_key}",
+        "UNIFI_ALLOW_WRITES": "${user_config.allow_writes}",
+        "UNIFI_LOCAL_URL": "${user_config.local_url}",
+        "UNIFI_LOCAL_API_KEY": "${user_config.local_api_key}",
+        "UNIFI_DEFAULT_CONSOLE": "${user_config.default_console}"
+      }
+    }
+  }
+}

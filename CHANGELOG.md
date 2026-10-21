@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.2.0
+
+- Installable as a Claude Code plugin (`/plugin install unifi --marketplace troymroberts/unifi-mcp`);
+  Claude Code prompts for the Site Manager key, optional local console and write permission, and keeps
+  keys in its secure store.
+- One local console can be configured from env (`UNIFI_LOCAL_URL` / `UNIFI_LOCAL_API_KEY`) as `home`.
+- Keys can be kept in `~/.config/unifi-mcp/secrets.env` instead of the MCP client config.
+
 ## 0.1.0
 
 - Fleet tools over the Site Manager API: `list_consoles`, `list_cloud_sites`, `list_cloud_devices`,

@@ -105,15 +105,31 @@ def load_secrets_file(path: Path | None = None, env: dict[str, str] | None = Non
     return warnings
 
 
+def _get(env: Mapping[str, str], key: str) -> str | None:
+    """Env value, treating blanks and unsubstituted plugin placeholders (``${...}``) as unset."""
+    value = (env.get(key) or "").strip()
+    return value if value and not value.startswith("${") else None
+
+
 def load_settings(env: Mapping[str, str] | None = None) -> Settings:
     env = os.environ if env is None else env
-    path = Path(env.get("UNIFI_CONSOLES_FILE") or DEFAULT_CONSOLES_FILE).expanduser()
+    path = Path(_get(env, "UNIFI_CONSOLES_FILE") or DEFAULT_CONSOLES_FILE).expanduser()
     aliases, default = load_consoles_file(path)
+    # A single local console straight from env (how the Claude Code plugin configures "home").
+    local_url = _get(env, "UNIFI_LOCAL_URL")
+    if local_url:
+        name = (_get(env, "UNIFI_LOCAL_NAME") or "home").lower()
+        aliases.setdefault(name, ConsoleAlias(
+            name=name,
+            local_url=local_url.rstrip("/"),
+            api_key_env="UNIFI_LOCAL_API_KEY",
+            verify_ssl=(_get(env, "UNIFI_LOCAL_VERIFY_SSL") or "false").lower() in TRUTHY,
+        ))
     return Settings(
-        sm_api_key=env.get("UNIFI_SM_API_KEY") or None,
-        allow_writes=env.get("UNIFI_ALLOW_WRITES", "").strip().lower() in TRUTHY,
+        sm_api_key=_get(env, "UNIFI_SM_API_KEY"),
+        allow_writes=(_get(env, "UNIFI_ALLOW_WRITES") or "").lower() in TRUTHY,
         aliases=aliases,
-        default_console=env.get("UNIFI_DEFAULT_CONSOLE") or default,
-        cloud_base_url=(env.get("UNIFI_CLOUD_BASE_URL") or "https://api.ui.com").rstrip("/"),
-        timeout=float(env.get("UNIFI_TIMEOUT", "30")),
+        default_console=_get(env, "UNIFI_DEFAULT_CONSOLE") or default,
+        cloud_base_url=(_get(env, "UNIFI_CLOUD_BASE_URL") or "https://api.ui.com").rstrip("/"),
+        timeout=float(_get(env, "UNIFI_TIMEOUT") or "30"),
     )

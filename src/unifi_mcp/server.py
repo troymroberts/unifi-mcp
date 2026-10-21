@@ -184,7 +184,7 @@ def create_server(settings: Settings | None = None, transport: httpx.AsyncBaseTr
     sm = SiteManagerAPI(backend, settings.sm_api_key, settings.cloud_base_url)
     network = NetworkAPI(backend)
     resolver = Resolver(settings, sm, network)
-    mcp = MCPServer("unifi", instructions=INSTRUCTIONS, version="0.1.0")
+    mcp = MCPServer("unifi", instructions=INSTRUCTIONS, version="0.2.0")
 
     async def fleet() -> tuple[list[dict], list[dict], dict[str, dict]]:
         hosts = await resolver.hosts()
