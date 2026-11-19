@@ -435,13 +435,17 @@ def create_server(settings: Settings | None = None, transport: httpx.AsyncBaseTr
     @_guard
     async def device_health(
         console: str | None = None, site: str | None = None, problems_only: bool = False,
+        include_sfp: bool = False,
     ) -> dict[str, Any]:
         """Per-device health from classic stat/device: CPU %, RAM %, temperature, uptime, firmware; for
-        switches the ports with errors/drops, STP-blocking or PoE faults; for APs each radio's airtime,
-        external interference, TX-retry % and client count. problems_only returns only devices with a
-        flagged issue. Use it for 'which switch/AP is overloaded, which port is erroring or blocked'.
-        Needs a console that answers the classic API."""
-        return await locator.device_health(console=console, site=site, problems_only=problems_only)
+        switches the ports with errors, STP-blocking or PoE faults; for APs each radio's airtime, external
+        interference, TX-retry % and client count. problems_only returns only devices with a flagged issue.
+        include_sfp adds every SFP/SFP+ port's DDM optics (rx/tx optical power, temperature, vendor) as
+        sfp_ports — for isolating a fibre vs transceiver fault (low Rx power -> fibre/far-end; bad local Tx ->
+        the module); a flagged SFP port already carries its sfp block. Needs a console that answers the
+        classic API."""
+        return await locator.device_health(console=console, site=site, problems_only=problems_only,
+                                           include_sfp=include_sfp)
 
     @mcp.tool(annotations=READ)
     @_guard

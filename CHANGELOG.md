@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.6.2
+- `device_health`: SFP/SFP+ DDM optics. A flagged SFP port now carries an `sfp` block (rx/tx optical
+  power, temperature, vendor, whatever `sfp*` fields the firmware reports); `include_sfp=true` adds every
+  SFP port's optics as `sfp_ports`. Isolates a fibre/connector fault (low Rx power, or low far-end Tx)
+  from a failing transceiver (abnormal local Tx) without a site visit. DAC/non-DDM optics report little.
+
 ## 0.6.1
 Fixes from live validation against a real controller:
 - `device_health` no longer flags a port for `rx_dropped`/`tx_dropped` alone — UniFi counts normal flooded

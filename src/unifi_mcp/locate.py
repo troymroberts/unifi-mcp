@@ -92,6 +92,16 @@ def _sat(v: Any) -> float | None:
     return None if (n is None or n < 0) else n
 
 
+def _sfp(p: dict[str, Any]) -> dict[str, Any]:
+    """SFP/DDM optics fields from a classic port record (rx/tx optical power, temperature, vendor, part...).
+
+    Returns whatever ``sfp*`` keys the firmware reports, so it survives naming differences; DAC and
+    non-DDM optics report little or nothing. Low Rx power points at fibre/connector or the far-end Tx;
+    abnormal local Tx power points at the local module.
+    """
+    return {k: v for k, v in p.items() if k.startswith("sfp") and v not in (None, "")}
+
+
 def normalize_mac(value: str | None) -> str | None:
     """'AA-BB-CC-DD-EE-FF', 'aabb.ccdd.eeff', 'aa:bb:...' -> 'aa:bb:cc:dd:ee:ff'; None if not a MAC."""
     if not value:
@@ -338,7 +348,7 @@ class ClientLocator:
         return out
 
     @staticmethod
-    def _device_entry(d: dict[str, Any], site_name: str | None) -> dict[str, Any]:
+    def _device_entry(d: dict[str, Any], site_name: str | None, include_sfp: bool = False) -> dict[str, Any]:
         sysstats = d.get("system-stats") or {}
         sys2 = d.get("sys_stats") or {}
         state = d.get("state")
@@ -362,7 +372,12 @@ class ClientLocator:
             "site": site_name,
         }
         bad_ports = []
+        sfp_ports = []
         for p in d.get("port_table") or []:
+            sfp = _sfp(p)
+            if include_sfp and sfp:
+                sfp_ports.append(_prune({"port": p.get("port_idx"), "name": p.get("name"), "up": p.get("up"),
+                                         "speed": p.get("speed"), "sfp": sfp}))
             issues = []
             if (p.get("rx_errors") or 0) or (p.get("tx_errors") or 0):
                 issues.append(f"errors rx{p.get('rx_errors', 0)}/tx{p.get('tx_errors', 0)}")
@@ -376,10 +391,12 @@ class ClientLocator:
                 bad_ports.append(_prune({"port": p.get("port_idx"), "name": p.get("name"), "up": p.get("up"),
                                          "speed": p.get("speed"), "stp_state": p.get("stp_state"),
                                          "rx_errors": p.get("rx_errors"), "tx_errors": p.get("tx_errors"),
-                                         "issues": issues}))
+                                         "sfp": sfp or None, "issues": issues}))
         if bad_ports:
             entry["problem_ports"] = bad_ports
             problems.append(f"{len(bad_ports)} port issue(s)")
+        if sfp_ports:
+            entry["sfp_ports"] = sfp_ports
         radios = []
         for r in d.get("radio_table_stats") or []:
             airtime = _num(r.get("cu_total"))
@@ -402,10 +419,12 @@ class ClientLocator:
         return _prune(entry)
 
     async def device_health(self, console: str | None, site: str | None,
-                            problems_only: bool = False) -> dict[str, Any]:
+                            problems_only: bool = False, include_sfp: bool = False) -> dict[str, Any]:
         """Per-device health from classic ``stat/device``: CPU/RAM/temp/uptime, switch port errors/STP-blocking/
         PoE faults, and AP per-radio airtime/external-interference/TX-retries/client-count. ``problems_only``
-        returns just the devices with a flagged issue. Needs a console that answers the classic API."""
+        returns just the devices with a flagged issue. ``include_sfp`` adds every SFP/SFP+ port's DDM optics
+        (rx/tx optical power, temperature, vendor) as ``sfp_ports`` — for isolating a fibre vs transceiver fault;
+        a flagged SFP port already carries its ``sfp`` block. Needs a console that answers the classic API."""
         target = await self.resolver.console(console)
         sites = await self._sites(target, site)
         devices: list[dict[str, Any]] = []
@@ -416,7 +435,7 @@ class ClientLocator:
             except UniFiAPIError:
                 continue
             source = "legacy stat/device"
-            devices.extend(self._device_entry(d, s.get("name")) for d in rows)
+            devices.extend(self._device_entry(d, s.get("name"), include_sfp=include_sfp) for d in rows)
         if problems_only:
             devices = [d for d in devices if d.get("problems")]
         out: dict[str, Any] = {"count": len(devices), "devices": devices}

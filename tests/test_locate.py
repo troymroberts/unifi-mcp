@@ -43,7 +43,10 @@ DEVICE_STAT = {"meta": {"rc": "ok"}, "data": [
           "rx_dropped": 500000, "tx_dropped": 12000},
          {"port_idx": 20, "name": "Cashier 7", "up": True, "speed": 100, "stp_state": "forwarding",
           "rx_errors": 1234, "tx_errors": 5},
-         {"port_idx": 24, "name": "Loop", "up": True, "speed": 1000, "stp_state": "blocking"}]},
+         {"port_idx": 24, "name": "Loop", "up": True, "speed": 1000, "stp_state": "blocking"},
+         {"port_idx": 49, "name": "SFP+ 1", "up": True, "speed": 10000, "stp_state": "forwarding",
+          "rx_errors": 777, "tx_errors": 0, "sfp_found": True, "sfp_rxpower": "-18.50",
+          "sfp_txpower": "-2.30", "sfp_temperature": "45.1", "sfp_vendor": "UBNT"}]},
     {"mac": "e0:63:da:e3:79:04", "name": "Basement AP2", "model": "U7NHD", "type": "uap", "state": 1,
      "uptime": 500000, "general_temperature": 52, "system-stats": {"cpu": "12.0", "mem": "58.0"},
      "radio_table_stats": [
@@ -196,6 +199,19 @@ async def test_device_health_flags_ports_airtime_and_offline():
     assert "Basement AP1" in by  # state 0 -> flagged
     # drops alone must NOT flag a port (UniFi counts normal flooded frames there)
     assert all(p["port"] != 1 for p in sw["problem_ports"])
+    # a flagged SFP port carries its DDM optics inline
+    sfpp = next(p for p in sw["problem_ports"] if p["port"] == 49)
+    assert sfpp["sfp"]["sfp_rxpower"] == "-18.50" and sfpp["sfp"]["sfp_vendor"] == "UBNT"
+
+
+async def test_device_health_include_sfp_lists_optics():
+    fake = FakeFleet()
+    r = await call(make(fake), "device_health", console="Office-UDM", site="Default", include_sfp=True)
+    sw = next(d for d in r["devices"] if d["name"] == "1 - Ground Floor Main")
+    sfp = next(p for p in sw["sfp_ports"] if p["port"] == 49)
+    assert sfp["sfp"]["sfp_rxpower"] == "-18.50" and sfp["sfp"]["sfp_temperature"] == "45.1"
+    # non-SFP ports are not listed
+    assert all(p["port"] == 49 for p in sw["sfp_ports"])
 
 
 async def test_site_health_subsystems():
