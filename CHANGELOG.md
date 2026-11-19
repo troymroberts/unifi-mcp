@@ -1,5 +1,28 @@
 # Changelog
 
+## 0.6.0
+Wi-Fi + infrastructure diagnostics (all classic-API via the Connector; a console that only answers the
+Integration API gets a note instead of data). Version 0.6.0 to avoid colliding with the 0.5.0
+`feat/client-reservations` branch — reconcile at merge.
+- `find_client`: wireless hits now include `band_ghz` (2.4/5/6), `channel`, `signal_dbm` and UniFi
+  `satisfaction` on the access_point.
+- `list_wireless_clients`: connected wireless clients with band/channel/signal/experience, filterable by
+  `band` (2.4/5/6), `network` (VLAN-name substring) or `ssid` — e.g. "which clients are on 2.4 GHz on the
+  voice VLAN".
+- `list_events`: diagnostic timeline from `stat/event` — roam (from-AP → to-AP, channel/radio), connect,
+  disconnect, switch `port_up`/`port_down` (flapping), `lost_contact`, `restart`, `stp`; device/AP names
+  resolved; filter by `macs`, `kinds`, `hours`.
+- `device_health`: per-device from `stat/device` — CPU/RAM/temp/uptime/firmware; switch ports with
+  errors/drops, STP-blocking or PoE faults; AP per-radio airtime, external interference, TX-retry % and
+  client count; `problems_only`.
+- `site_health`: `stat/health` per subsystem — WAN latency/drops, throughput, device/client counts.
+- `client_app_usage`: per-client DPI (`stat/stadpi`) application/category traffic by bytes, tied to the
+  client (for "which client used the most <app>"). DPI reports data volume, not time-on-app; app/category
+  ids plus any name the controller supplies.
+- Note: `device_health`/`site_health`/`client_app_usage` parse classic schemas defensively (missing fields
+  are omitted) and should be sanity-checked against a live controller; app-id→name and a per-app usage
+  timeline are follow-ups.
+
 ## 0.4.0
 - `find_client`: locate a client by MAC(s), IP or name down to the switch port (classic `stat/sta` via the
   Connector) or AP + SSID, falling back to the Integration API's uplink device. Hint-first search

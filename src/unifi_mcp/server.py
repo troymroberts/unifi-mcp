@@ -52,7 +52,14 @@ UniFi fleet + Network API access.
 - Per console: pass console= as a consoles.yaml alias (e.g. 'home'), a console hostname (partial is fine if
   unique) or a Site Manager host id. Cloud consoles go through the Connector; local aliases go direct.
 - site= accepts a site name, internal reference or id; omit it when the console has one site.
-- Where is a machine plugged in? find_client(macs=[...], console=/site= hint, group=) -> site + switch/port or AP.
+- Where is a machine plugged in? find_client(macs=[...], console=/site= hint, group=) -> site + switch/port or AP
+  (wireless hits include band/channel/signal/experience).
+- Diagnostics (classic API via the Connector): list_wireless_clients(console, site, band=/network=/ssid=) -> clients with
+  band/signal/experience (e.g. band=2.4 on the voice VLAN); list_events(console, site, macs=/kinds=/hours=) -> roam /
+  connect / disconnect / port_up / port_down (flapping) / lost_contact / restart / stp timeline; device_health(console,
+  site, problems_only=) -> switch/AP CPU/RAM/temp + port errors/STP/PoE + per-radio airtime/interference/retries;
+  site_health(console, site) -> WAN latency/packet-drops and subsystem status. These need a console that answers the
+  classic API; a console that only answers the Integration API returns a note instead.
 - Anything not covered by a curated tool: network_api_endpoints -> network_api_describe -> network_api_request.
 - Protect (cameras/NVR): protect_list_cameras, protect_list_devices, protect_camera_snapshot, protect_events,
   protect_license_plates, protect_api_request. Events and plates use Protect's internal API (cloud Connector).
@@ -395,6 +402,66 @@ def create_server(settings: Settings | None = None, transport: httpx.AsyncBaseTr
         through the Connector; if a console refuses it, the Integration API gives the uplink device only."""
         return await locator.find(macs=macs, ip=ip, name=name, console=console, site=site, group=group,
                                   search_fleet=search_fleet)
+
+    @mcp.tool(annotations=READ)
+    @_guard
+    async def list_wireless_clients(
+        console: str | None = None, site: str | None = None, band: float | None = None,
+        network: str | None = None, ssid: str | None = None,
+    ) -> dict[str, Any]:
+        """List connected WIRELESS clients with their radio band (2.4/5/6 GHz), channel, signal (dBm),
+        UniFi experience/satisfaction, AP and SSID — from the classic stat/sta data via the Connector.
+        Filter by band (2.4, 5 or 6), network (substring of the VLAN/network name) or ssid (exact).
+        Answers 'which clients are on 2.4 GHz on the voice VLAN'. If a console only answers the Integration
+        API, band/signal are unavailable (a note says so)."""
+        return await locator.list_wireless(console=console, site=site, band=band, network=network, ssid=ssid)
+
+    @mcp.tool(annotations=READ)
+    @_guard
+    async def list_events(
+        console: str | None = None, site: str | None = None, macs: list[str] | None = None,
+        kinds: list[str] | None = None, hours: int = 24, limit: int = 200,
+    ) -> dict[str, Any]:
+        """Recent diagnostic events from the classic stat/event feed, with device/AP names resolved:
+        client roam (from-AP -> to-AP, channel/radio change), connect/disconnect, switch port_up/port_down
+        (flapping), device lost_contact, restart and STP changes. Use it to see why a client has poor Wi-Fi
+        (excessive roaming/flapping) or why a port/AP dropped. Filter by client macs, kinds
+        (roam/connect/disconnect/port_up/port_down/lost_contact/restart/stp) and hours (0 = no time limit).
+        The Integration API has no event history, so a console that only answers it returns nothing."""
+        return await locator.list_events(console=console, site=site, macs=macs, kinds=kinds,
+                                         hours=hours, limit=limit)
+
+    @mcp.tool(annotations=READ)
+    @_guard
+    async def device_health(
+        console: str | None = None, site: str | None = None, problems_only: bool = False,
+    ) -> dict[str, Any]:
+        """Per-device health from classic stat/device: CPU %, RAM %, temperature, uptime, firmware; for
+        switches the ports with errors/drops, STP-blocking or PoE faults; for APs each radio's airtime,
+        external interference, TX-retry % and client count. problems_only returns only devices with a
+        flagged issue. Use it for 'which switch/AP is overloaded, which port is erroring or blocked'.
+        Needs a console that answers the classic API."""
+        return await locator.device_health(console=console, site=site, problems_only=problems_only)
+
+    @mcp.tool(annotations=READ)
+    @_guard
+    async def site_health(console: str | None = None, site: str | None = None) -> dict[str, Any]:
+        """Site health from classic stat/health: per-subsystem (wan/www/wlan/lan) status, WAN latency and
+        packet drops, throughput, and device/client counts — the 'Site Health' row of the dashboard."""
+        return await locator.site_health(console=console, site=site)
+
+    @mcp.tool(annotations=READ)
+    @_guard
+    async def client_app_usage(
+        console: str | None = None, site: str | None = None, macs: list[str] | None = None,
+        top: int = 12, min_mb: float = 0.0,
+    ) -> dict[str, Any]:
+        """Per-client application traffic from UniFi DPI (classic stat/stadpi), tied to the client device:
+        each client's total data and its top apps and categories by bytes — for auditing 'which client used
+        the most <app>'. NOTE: DPI measures data volume (bytes), not time-on-app, and app/category come back
+        as DPI ids (plus any name the controller supplies). Filter by macs; min_mb drops tiny talkers. Needs
+        DPI enabled on the site and a console that answers the classic API."""
+        return await locator.client_app_usage(console=console, site=site, macs=macs, top=top, min_mb=min_mb)
 
     @mcp.tool(annotations=READ)
     @_guard

@@ -25,7 +25,12 @@ An MCP server for managing UniFi deployments from Claude (or any MCP client).
 | `list_devices`, `get_device` | Adopted devices; one device's details plus latest statistics |
 | `list_pending_devices` | Devices waiting for adoption |
 | `list_clients`, `get_client` | Connected clients |
-| `find_client` | Where a machine is plugged in: console, site, **switch + port** (wired) or **AP + SSID** (wireless), by MAC(s), IP or name; searches a hint first, then remembered locations, `groups`-mapped consoles, then the fleet |
+| `find_client` | Where a machine is plugged in: console, site, **switch + port** (wired) or **AP + SSID** (wireless, with band/channel/signal/experience), by MAC(s), IP or name; searches a hint first, then remembered locations, `groups`-mapped consoles, then the fleet |
+| `list_wireless_clients` | Connected wireless clients with **band (2.4/5/6 GHz)**, channel, signal, UniFi experience, AP and SSID; filter by `band`, `network` (VLAN name) or `ssid` |
+| `list_events` | Diagnostic timeline: client **roam** (from-AP → to-AP), connect/disconnect, switch **port_up/port_down** (flapping), **lost_contact**, restart, STP — filter by `macs`, `kinds`, `hours` |
+| `device_health` | Per device: CPU/RAM/temp/uptime; **switch** port errors/drops, STP-blocking, PoE faults; **AP** per-radio airtime, external interference, TX-retry %, client count; `problems_only` |
+| `site_health` | Per subsystem (wan/www/wlan/lan): WAN latency and packet drops, throughput, device/client counts |
+| `client_app_usage` | Per-client **DPI** application/category traffic by bytes, tied to the client (for auditing "which client used the most <app>"; data volume, not time) |
 | `list_site_config` | networks, wifi, firewall-policies/zones, acl-rules, dns-policies, wans, vpn-servers/tunnels, vouchers, radius-profiles, device-tags, LAGs, switch stacks, traffic-matching-lists |
 | `network_api_endpoints`, `network_api_describe` | Search the bundled Network API spec; show parameters and request body schema |
 | `network_api_request` | Call any Network API path (GET runs; other methods are gated writes) |
