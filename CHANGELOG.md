@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.6.1
+Fixes from live validation against a real controller:
+- `device_health` no longer flags a port for `rx_dropped`/`tx_dropped` alone — UniFi counts normal flooded
+  broadcast/multicast frames there, so almost every access port was being reported. Only real errors,
+  STP-blocking and PoE faults are flagged now.
+- Satisfaction/experience of `-1` (UniFi's "not computed") is reported as absent instead of a `-1` score,
+  in `device_health` radios, `list_wireless_clients` and `find_client`.
+- `client_app_usage` gives a clearer note when DPI is reachable but returns nothing ("enable Deep Packet
+  Inspection and DPI stats on the site").
+
 ## 0.6.0
 Wi-Fi + infrastructure diagnostics (all classic-API via the Connector; a console that only answers the
 Integration API gets a note instead of data). Version 0.6.0 to avoid colliding with the 0.5.0
