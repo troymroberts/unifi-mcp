@@ -86,6 +86,12 @@ def _num(v: Any) -> float | None:
         return None
 
 
+def _sat(v: Any) -> float | None:
+    """UniFi satisfaction/experience score; -1 (and other negatives) mean 'not computed' -> None."""
+    n = _num(v)
+    return None if (n is None or n < 0) else n
+
+
 def normalize_mac(value: str | None) -> str | None:
     """'AA-BB-CC-DD-EE-FF', 'aabb.ccdd.eeff', 'aa:bb:...' -> 'aa:bb:cc:dd:ee:ff'; None if not a MAC."""
     if not value:
@@ -161,7 +167,7 @@ class ClientLocator:
             "channel": r.get("channel") if not wired else None,
             "band_ghz": band_ghz(r.get("radio"), r.get("channel")) if not wired else None,
             "signal_dbm": (r.get("signal") if r.get("signal") is not None else r.get("rssi")) if not wired else None,
-            "satisfaction": r.get("satisfaction") if not wired else None,
+            "satisfaction": _sat(r.get("satisfaction")) if not wired else None,
             "tx_rate_kbps": r.get("tx_rate") if not wired else None,
             "rx_rate_kbps": r.get("rx_rate") if not wired else None,
             "last_seen": r.get("last_seen"),
@@ -360,8 +366,8 @@ class ClientLocator:
             issues = []
             if (p.get("rx_errors") or 0) or (p.get("tx_errors") or 0):
                 issues.append(f"errors rx{p.get('rx_errors', 0)}/tx{p.get('tx_errors', 0)}")
-            if (p.get("rx_dropped") or 0) or (p.get("tx_dropped") or 0):
-                issues.append("drops")
+            # NOTE: rx_dropped/tx_dropped are NOT flagged — UniFi counts normal flooded
+            # broadcast/multicast frames there, so nearly every access port would trip.
             if str(p.get("stp_state") or "").lower() == "blocking":
                 issues.append("stp-blocking")
             if p.get("poe_enable") and p.get("poe_good") is False:
@@ -385,7 +391,7 @@ class ClientLocator:
                 "airtime_pct": airtime, "ext_interference_pct": ext,
                 "tx_retries_pct": _num(r.get("tx_retries_pct") if r.get("tx_retries_pct") is not None
                                        else r.get("tx_retries")),
-                "satisfaction": _num(r.get("satisfaction")), "tx_power": r.get("tx_power"),
+                "satisfaction": _sat(r.get("satisfaction")), "tx_power": r.get("tx_power"),
             }))
             if airtime is not None and airtime >= 80:
                 problems.append(f"{b} GHz airtime {airtime}%")
@@ -498,8 +504,11 @@ class ClientLocator:
         out: dict[str, Any] = {"count": len(clients), "clients": clients,
                                "note": "DPI measures data volume (bytes) per app, not time spent."}
         if not reachable:
-            out["note"] = ("No classic stat/stadpi data: DPI may be disabled, or this console only answered "
-                           "the Integration API.")
+            out["note"] = ("No classic stat/stadpi data: this console only answered the Integration API, "
+                           "which has no DPI.")
+        elif not clients:
+            out["note"] = ("DPI returned no data — enable Deep Packet Inspection and DPI stats on the site "
+                           "(UniFi Network > Settings), then retry.")
         return out
 
     # ------------------------------------------------------------------ search plan

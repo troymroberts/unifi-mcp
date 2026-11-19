@@ -39,7 +39,8 @@ DEVICE_STAT = {"meta": {"rc": "ok"}, "data": [
      "state": 1, "uptime": 864000, "version": "7.0.0", "general_temperature": 45,
      "system-stats": {"cpu": "7.5", "mem": "46.0"}, "sys_stats": {"loadavg_1": "0.8"},
      "port_table": [
-         {"port_idx": 1, "name": "Uplink", "up": True, "speed": 1000, "stp_state": "forwarding"},
+         {"port_idx": 1, "name": "Uplink", "up": True, "speed": 1000, "stp_state": "forwarding",
+          "rx_dropped": 500000, "tx_dropped": 12000},
          {"port_idx": 20, "name": "Cashier 7", "up": True, "speed": 100, "stp_state": "forwarding",
           "rx_errors": 1234, "tx_errors": 5},
          {"port_idx": 24, "name": "Loop", "up": True, "speed": 1000, "stp_state": "blocking"}]},
@@ -47,7 +48,7 @@ DEVICE_STAT = {"meta": {"rc": "ok"}, "data": [
      "uptime": 500000, "general_temperature": 52, "system-stats": {"cpu": "12.0", "mem": "58.0"},
      "radio_table_stats": [
          {"radio": "ng", "channel": 6, "num_sta": 18, "cu_total": 88, "cu_self_rx": 10, "cu_self_tx": 12,
-          "tx_retries": 35, "satisfaction": 40, "tx_power": 20},
+          "tx_retries": 35, "satisfaction": -1, "tx_power": 20},
          {"radio": "na", "channel": 36, "num_sta": 5, "cu_total": 20, "cu_self_rx": 5, "cu_self_tx": 5,
           "tx_retries": 4, "satisfaction": 95}]},
     {"mac": "e0:63:da:e3:79:05", "name": "Basement AP1", "model": "U7NHD", "type": "uap", "state": 0,
@@ -190,8 +191,11 @@ async def test_device_health_flags_ports_airtime_and_offline():
     ap = by["Basement AP2"]
     r24 = next(rad for rad in ap["radios"] if rad["band_ghz"] == 2.4)
     assert r24["airtime_pct"] == 88 and r24["clients"] == 18 and r24["ext_interference_pct"] == 66
+    assert "satisfaction" not in r24  # -1 (not computed) is dropped, not reported as a score
     assert any("airtime" in p for p in ap["problems"])
     assert "Basement AP1" in by  # state 0 -> flagged
+    # drops alone must NOT flag a port (UniFi counts normal flooded frames there)
+    assert all(p["port"] != 1 for p in sw["problem_ports"])
 
 
 async def test_site_health_subsystems():
