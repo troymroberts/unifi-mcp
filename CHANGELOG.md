@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.10.1
+- `list_ap_radios` / `set_ap_radios`: fall back to the `stat/device` record (which carries `radio_table`) when the
+  console answers `GET rest/device/<id>` with 400/404/405 — seen live through the Connector, where every call
+  failed with "HTTP 404" before anything was written. Writes still `PUT rest/device/<id>`.
+- Known limitation (`list_ap_neighbors`): live controllers omit your own adopted APs from `stat/rogueap`, so
+  `same_channel_own` / `loudest_own_aps` stay empty there; foreign interference is reported correctly.
+
 ## 0.10.0
 - `list_ap_neighbors` (read-only): the neighbouring BSSIDs each AP hears, from classic `stat/rogueap`, with SSID,
   band, channel, signal (dBm; UniFi's SNR-style `rssi` converted when `signal` is absent) and whether it is on the

@@ -210,7 +210,7 @@ def create_server(settings: Settings | None = None, transport: httpx.AsyncBaseTr
     switch_ports = SwitchPorts(settings, resolver, network)
     ap_radios = APRadios(settings, resolver, network)
     ap_neighbors = APNeighbors(settings, resolver, network)
-    mcp = MCPServer("unifi", instructions=INSTRUCTIONS, version="0.10.0")
+    mcp = MCPServer("unifi", instructions=INSTRUCTIONS, version="0.10.1")
 
     async def fleet() -> tuple[list[dict], list[dict], dict[str, dict]]:
         hosts = await resolver.hosts()
