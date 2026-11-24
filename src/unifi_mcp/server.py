@@ -17,6 +17,7 @@ from .client import NETWORK_APP, HttpBackend, NetworkAPI, NetworkTarget, SiteMan
 from .config import ConfigError, Settings, load_secrets_file, load_settings
 from .locate import ClientLocator
 from .ports import SwitchPorts
+from .neighbors import APNeighbors
 from .radios import APRadios
 from .reservations import Reservations
 from .resolve import Resolver, ResolveError, host_name
@@ -67,6 +68,8 @@ UniFi fleet + Network API access.
   ports=[{port, name?, native_network?, tagged?, profile?, poe_mode?}]) is a gated write (dry-run, then confirm=true).
 - AP radios: list_ap_radios(device) -> stored + live settings per band; set_ap_radios(device, radios=[{band: 2.4|5|6,
   tx_power?: auto|high|medium|low|<dBm>, channel?: auto|<n>, width?: <MHz>}]) is a gated write (dry-run, then confirm=true).
+- Interference: list_ap_neighbors(device=, band=, same_channel_only=, min_signal=) -> which APs each AP hears (own vs
+  foreign, channel, dBm); without device, a site summary + loudest_own_aps (power/channel tuning candidates). Read-only.
 - Anything not covered by a curated tool: network_api_endpoints -> network_api_describe -> network_api_request.
 - Protect (cameras/NVR): protect_list_cameras, protect_list_devices, protect_camera_snapshot, protect_events,
   protect_license_plates, protect_api_request. Events and plates use Protect's internal API (cloud Connector).
@@ -206,7 +209,8 @@ def create_server(settings: Settings | None = None, transport: httpx.AsyncBaseTr
     reservations = Reservations(settings, resolver, network)
     switch_ports = SwitchPorts(settings, resolver, network)
     ap_radios = APRadios(settings, resolver, network)
-    mcp = MCPServer("unifi", instructions=INSTRUCTIONS, version="0.9.0")
+    ap_neighbors = APNeighbors(settings, resolver, network)
+    mcp = MCPServer("unifi", instructions=INSTRUCTIONS, version="0.10.0")
 
     async def fleet() -> tuple[list[dict], list[dict], dict[str, dict]]:
         hosts = await resolver.hosts()
@@ -547,6 +551,20 @@ def create_server(settings: Settings | None = None, transport: httpx.AsyncBaseTr
         The plan shows each radio's stored entry so field names can be checked first. Returns a plan (dry run)
         until confirm=true; needs UNIFI_ALLOW_WRITES=true to apply. The AP re-provisions; clients may reconnect."""
         return await ap_radios.set_radios(device, radios, console, site, confirm)
+
+    @mcp.tool(annotations=READ)
+    @_guard
+    async def list_ap_neighbors(
+        device: str | None = None, console: str | None = None, site: str | None = None,
+        band: str | None = None, same_channel_only: bool = False, min_signal: int | None = None, limit: int = 40,
+    ) -> dict[str, Any]:
+        """Neighbouring APs each of your APs hears (classic stat/rogueap), for interference tuning. With device
+        (name, MAC or id): that AP's own channels and every BSSID it hears - SSID, band, channel, signal dBm,
+        same_channel, own_ap (which of your APs) or foreign - strongest first. Without device: per-AP counts of
+        same-channel own/foreign neighbours and the strongest one, plus loudest_own_aps = your APs heard on the
+        same channel by the most other APs (candidates for lower tx power / another channel). band = 2.4, 5 or
+        6; min_signal e.g. -75 drops faint ones. Read-only."""
+        return await ap_neighbors.neighbors(console, site, device, band, same_channel_only, min_signal, limit)
 
     @mcp.tool(annotations=READ)
     @_guard

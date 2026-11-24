@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.10.0
+- `list_ap_neighbors` (read-only): the neighbouring BSSIDs each AP hears, from classic `stat/rogueap`, with SSID,
+  band, channel, signal (dBm; UniFi's SNR-style `rssi` converted when `signal` is absent) and whether it is on the
+  AP's own channel. Own APs are recognised from every adopted AP's `vap_table` BSSIDs (`own_ap` = device name);
+  Ubiquiti BSSIDs broadcasting one of your SSIDs but not adopted are `likely_own`; the rest are `foreign`. With
+  `device`: that AP's neighbours, strongest first. Without: per-AP same-channel own/foreign counts and the
+  strongest, plus `loudest_own_aps` (your APs heard on the same channel by the most other APs, and how loudly) —
+  the candidates for lower transmit power or a different channel. Filters: `band`, `same_channel_only`,
+  `min_signal`.
+
 ## 0.9.0
 AP radio settings (classic `rest/device` `radio_table` via the Connector; the Integration API can only restart
 an AP).
