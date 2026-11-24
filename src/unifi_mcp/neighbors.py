@@ -8,7 +8,9 @@ that channel". Own BSSIDs are recognised from every adopted AP's ``vap_table``. 
 
 from __future__ import annotations
 
+import time
 from collections import defaultdict
+from datetime import datetime, timezone
 from typing import Any
 
 from .client import NETWORK_LEGACY_APP, NetworkAPI, NetworkTarget
@@ -54,6 +56,26 @@ def _signal(row: dict[str, Any]) -> int | None:
     return None
 
 
+def _seen(row: dict[str, Any], now: float) -> tuple[str | None, int | None]:
+    """(last_seen ISO-8601 UTC, age in seconds) from classic 'last_seen' (epoch s or ms) or 'age' (s)."""
+    ts = row.get("last_seen")
+    try:
+        ts = float(ts) if ts is not None else None
+    except (TypeError, ValueError):
+        ts = None
+    if ts and ts > 1e12:  # milliseconds
+        ts /= 1000
+    if ts:
+        iso = datetime.fromtimestamp(ts, timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+        return iso, max(0, int(now - ts))
+    try:
+        age = int(row["age"])
+    except (KeyError, TypeError, ValueError):
+        return None, None
+    iso = datetime.fromtimestamp(now - age, timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    return iso, age
+
+
 class APNeighbors:
     def __init__(self, settings: Settings, resolver: Resolver, network: NetworkAPI):
         self.settings = settings
@@ -84,7 +106,8 @@ class APNeighbors:
 
     async def neighbors(self, console: str | None, site: str | None, device: str | None = None,
                         band: str | float | None = None, same_channel_only: bool = False,
-                        min_signal: int | None = None, limit: int = 40) -> dict[str, Any]:
+                        min_signal: int | None = None, limit: int = 40,
+                        max_age_s: int | None = None) -> dict[str, Any]:
         target = await self.resolver.console(console)
         site_ref, site_name = await self._site_ref(target, site)
         devices = await self._legacy(target, site_ref, "GET", "/stat/device")
@@ -118,6 +141,7 @@ class APNeighbors:
             only = hits[0]
 
         heard: dict[str, list[dict[str, Any]]] = defaultdict(list)
+        now = time.time()
         for row in await self._legacy(target, site_ref, "GET", "/stat/rogueap"):
             rep = normalize_mac(row.get("ap_mac"))
             ap = by_mac.get(rep)
@@ -128,6 +152,9 @@ class APNeighbors:
                 continue
             sig = _signal(row)
             if min_signal is not None and (sig is None or sig < min_signal):
+                continue
+            last_seen, age_s = _seen(row, now)
+            if max_age_s is not None and age_s is not None and age_s > max_age_s:
                 continue
             mine = self._ap_channels(ap).get(nb_band or "", {})
             try:
@@ -140,7 +167,7 @@ class APNeighbors:
             own = own_bssid.get(bssid)
             heard[ap.get("name") or rep].append({
                 "bssid": bssid, "essid": row.get("essid"), "band_ghz": nb_band, "channel": row.get("channel"),
-                "signal_dbm": sig, "same_channel": same,
+                "signal_dbm": sig, "same_channel": same, "last_seen": last_seen, "age_s": age_s,
                 "own_ap": own, "likely_own": bool(not own and row.get("is_ubnt") and row.get("essid") in own_ssids),
                 "foreign": not own and not (row.get("is_ubnt") and row.get("essid") in own_ssids),
             })
