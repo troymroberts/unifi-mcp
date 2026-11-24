@@ -16,6 +16,7 @@ from . import protect, spec
 from .client import NETWORK_APP, HttpBackend, NetworkAPI, NetworkTarget, SiteManagerAPI, UniFiAPIError
 from .config import ConfigError, Settings, load_secrets_file, load_settings
 from .locate import ClientLocator
+from .ports import SwitchPorts
 from .reservations import Reservations
 from .resolve import Resolver, ResolveError, host_name
 
@@ -61,6 +62,8 @@ UniFi fleet + Network API access.
   site, problems_only=) -> switch/AP CPU/RAM/temp + port errors/STP/PoE + per-radio airtime/interference/retries;
   site_health(console, site) -> WAN latency/packet-drops and subsystem status. These need a console that answers the
   classic API; a console that only answers the Integration API returns a note instead.
+- Switch ports: list_switch_ports(device) -> per-port VLANs/profile/PoE + client MACs; set_switch_ports(device,
+  ports=[{port, name?, native_network?, tagged?, profile?, poe_mode?}]) is a gated write (dry-run, then confirm=true).
 - Anything not covered by a curated tool: network_api_endpoints -> network_api_describe -> network_api_request.
 - Protect (cameras/NVR): protect_list_cameras, protect_list_devices, protect_camera_snapshot, protect_events,
   protect_license_plates, protect_api_request. Events and plates use Protect's internal API (cloud Connector).
@@ -198,7 +201,8 @@ def create_server(settings: Settings | None = None, transport: httpx.AsyncBaseTr
     resolver = Resolver(settings, sm, network)
     locator = ClientLocator(settings, resolver, network)
     reservations = Reservations(settings, resolver, network)
-    mcp = MCPServer("unifi", instructions=INSTRUCTIONS, version="0.5.0")
+    switch_ports = SwitchPorts(settings, resolver, network)
+    mcp = MCPServer("unifi", instructions=INSTRUCTIONS, version="0.8.0")
 
     async def fleet() -> tuple[list[dict], list[dict], dict[str, dict]]:
         hosts = await resolver.hosts()
@@ -493,6 +497,31 @@ def create_server(settings: Settings | None = None, transport: httpx.AsyncBaseTr
         any item fails. Returns a plan (dry run) until confirm=true; needs UNIFI_ALLOW_WRITES=true to apply.
         Clients pick up a new fixed IP at their next DHCP request."""
         return await reservations.set_many(items, console, site, network, confirm)
+
+    @mcp.tool(annotations=READ)
+    @_guard
+    async def list_switch_ports(device: str, console: str | None = None, site: str | None = None,
+                                only_up: bool = False) -> dict[str, Any]:
+        """One switch's ports (device = name, MAC or id): link/speed, port name, profile, native network
+        (VLAN), tagged VLANs (all/none/custom + excluded), PoE mode/watts, uplink/LAG flags, UniFi devices fed
+        from the port, and the client MACs learned on it right now (several MACs on an access port usually mean
+        an unmanaged switch behind it). Classic controller API."""
+        return await switch_ports.list_ports(device, console, site, only_up)
+
+    @mcp.tool(annotations=WRITE)
+    @_guard
+    async def set_switch_ports(
+        device: str, ports: list[dict[str, Any]], console: str | None = None, site: str | None = None,
+        confirm: bool = False,
+    ) -> dict[str, Any]:
+        """Change switch port settings on one switch (device = name, MAC or id). ports = [{"port": 8,
+        "name": "Christmas Shop phone", "native_network": "VOIP LAN" | 5, "tagged": "all" | "none" |
+        ["Camera LAN", 7], "profile": "<port profile>", "poe_mode": "auto" | "off"}, ...] (each field optional;
+        profile is exclusive with native_network/tagged). native_network = the untagged VLAN (name, VLAN id or
+        id). Refuses the switch's uplink, LAG members and ports feeding UniFi devices for VLAN/profile/PoE-off
+        changes, and writes nothing if any port has an error. The plan lists clients_affected per port.
+        Returns a plan (dry run) until confirm=true; needs UNIFI_ALLOW_WRITES=true to apply."""
+        return await switch_ports.set_ports(device, ports, console, site, confirm)
 
     @mcp.tool(annotations=READ)
     @_guard

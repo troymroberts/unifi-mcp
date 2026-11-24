@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.8.0
+Switch port settings (classic `rest/device` port overrides via the Connector; the Integration API can only
+power-cycle a port).
+- `list_switch_ports`: one switch's ports with link/speed, name, profile, native network (VLAN), tagged VLANs
+  (all/none/custom + excluded), PoE mode/watts, uplink/LAG flags, UniFi devices fed from the port, and the client
+  MACs learned on each port (spot an unmanaged switch behind an access port).
+- `set_switch_ports`: name, native VLAN (network name, VLAN id or id), tagged VLANs (`all`, `none` or a list of
+  networks), port profile, PoE `auto`/`off` for several ports of one switch. Whole batch validated first; refuses
+  the switch's uplink, LAG members and ports feeding adopted UniFi devices for VLAN/profile/PoE-off changes; the
+  plan shows the clients each change affects; dry-run until `confirm=true`, needs `UNIFI_ALLOW_WRITES=true`.
+  Writes the device's full `port_overrides` list with only the requested ports changed.
+
 ## 0.7.0
 Client DHCP reservations and aliases (classic `rest/user` via the Connector; the Integration API has no
 fixed-IP or client-name write). Originally the 0.5.0 `feat/client-reservations` branch, rebased onto 0.6.2.
