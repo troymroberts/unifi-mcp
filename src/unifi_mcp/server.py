@@ -210,7 +210,7 @@ def create_server(settings: Settings | None = None, transport: httpx.AsyncBaseTr
     switch_ports = SwitchPorts(settings, resolver, network)
     ap_radios = APRadios(settings, resolver, network)
     ap_neighbors = APNeighbors(settings, resolver, network)
-    mcp = MCPServer("unifi", instructions=INSTRUCTIONS, version="0.10.1")
+    mcp = MCPServer("unifi", instructions=INSTRUCTIONS, version="0.10.2")
 
     async def fleet() -> tuple[list[dict], list[dict], dict[str, dict]]:
         hosts = await resolver.hosts()
@@ -557,14 +557,18 @@ def create_server(settings: Settings | None = None, transport: httpx.AsyncBaseTr
     async def list_ap_neighbors(
         device: str | None = None, console: str | None = None, site: str | None = None,
         band: str | None = None, same_channel_only: bool = False, min_signal: int | None = None, limit: int = 40,
+        max_age_s: int | None = None,
     ) -> dict[str, Any]:
         """Neighbouring APs each of your APs hears (classic stat/rogueap), for interference tuning. With device
         (name, MAC or id): that AP's own channels and every BSSID it hears - SSID, band, channel, signal dBm,
         same_channel, own_ap (which of your APs) or foreign - strongest first. Without device: per-AP counts of
         same-channel own/foreign neighbours and the strongest one, plus loudest_own_aps = your APs heard on the
         same channel by the most other APs (candidates for lower tx power / another channel). band = 2.4, 5 or
-        6; min_signal e.g. -75 drops faint ones. Read-only."""
-        return await ap_neighbors.neighbors(console, site, device, band, same_channel_only, min_signal, limit)
+        6; min_signal e.g. -75 drops faint ones. Each neighbour has last_seen (UTC) and age_s (seconds since the
+        AP last heard it); max_age_s e.g. 600 keeps only neighbours heard in the last 10 minutes (entries can linger
+        after a network goes quiet). Read-only."""
+        return await ap_neighbors.neighbors(console, site, device, band, same_channel_only, min_signal, limit,
+                                            max_age_s)
 
     @mcp.tool(annotations=READ)
     @_guard

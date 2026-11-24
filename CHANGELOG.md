@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.10.2
+- `list_ap_neighbors`: every neighbour now has `last_seen` (UTC) and `age_s` (seconds since the AP last heard it),
+  from classic `last_seen` (epoch seconds or milliseconds) or `age`. New `max_age_s` filter keeps only recently heard
+  neighbours — entries linger in `stat/rogueap` after a network goes quiet (seen live after a printer's Wi-Fi
+  Direct was switched off), so stale rows no longer look like live interference.
+
 ## 0.10.1
 - `list_ap_radios` / `set_ap_radios`: fall back to the `stat/device` record (which carries `radio_table`) when the
   console answers `GET rest/device/<id>` with 400/404/405 — seen live through the Connector, where every call

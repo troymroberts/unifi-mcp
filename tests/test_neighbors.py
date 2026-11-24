@@ -1,3 +1,5 @@
+import time
+
 import httpx
 import pytest
 from mcp.server.mcpserver.exceptions import ToolError
@@ -94,3 +96,31 @@ async def test_bad_band_and_unknown_device():
         await call(srv(), "list_ap_neighbors", band="7", **ARGS)
     with pytest.raises(ToolError, match="no single access point"):
         await call(srv(), "list_ap_neighbors", device="Core 1", **ARGS)
+
+
+class AgedConsole(FakeConsole):
+    """Same APs; rogue rows carry last_seen (epoch s / ms) or age, like live controllers."""
+
+    def __init__(self):
+        now = time.time()
+        self.rows = [
+            {**ROGUE[0], "last_seen": int(now - 30)},           # fresh, epoch seconds
+            {**ROGUE[1], "age": 4000},                          # stale, age only
+            {**ROGUE[3], "last_seen": int((now - 120) * 1000)},  # epoch milliseconds
+        ]
+
+    def __call__(self, request: httpx.Request) -> httpx.Response:
+        if request.url.path.endswith("/s/default/stat/rogueap"):
+            return httpx.Response(200, json={"meta": {"rc": "ok"}, "data": self.rows})
+        return super().__call__(request)
+
+
+async def test_last_seen_age_and_max_age_filter():
+    s = create_server(Settings(sm_api_key="k"), transport=httpx.MockTransport(AgedConsole()))
+    r = await call(s, "list_ap_neighbors", device="Downstairs Sales U7 Pro", **ARGS)
+    by_ssid = {n["essid"] if n["essid"] != "BSLTT" or n["own_ap"] else "likely": n for n in r["neighbors"]}
+    assert 25 <= by_ssid["BSLTT"]["age_s"] <= 40 and by_ssid["BSLTT"]["last_seen"].endswith("Z")
+    assert by_ssid["ShopWifi"]["age_s"] == 4000
+    assert 110 <= by_ssid["likely"]["age_s"] <= 135
+    fresh = await call(s, "list_ap_neighbors", device="Downstairs Sales U7 Pro", max_age_s=600, **ARGS)
+    assert {n["essid"] for n in fresh["neighbors"]} == {"BSLTT"} and len(fresh["neighbors"]) == 2
