@@ -26,6 +26,7 @@ class FakeConsole:
                    "radio_table": copy.deepcopy(RADIO_TABLE), "radio_table_stats": STATS}
         self.switch = {"_id": "dev-sw", "mac": "aa:00:00:00:00:01", "name": "Downstairs Switch", "port_table": []}
         self.puts: list[dict] = []
+        self.rest_get_404 = False  # like a live console that won't serve GET rest/device/<id>
 
     def __call__(self, request: httpx.Request) -> httpx.Response:
         path = request.url.path
@@ -41,6 +42,8 @@ class FakeConsole:
                 body = json.loads(request.content)
                 self.puts.append(body)
                 return ok([body])
+            if self.rest_get_404:
+                return httpx.Response(404, json={"message": "Not Found"})
             return ok([{"_id": "dev-u7", "radio_table": copy.deepcopy(self.ap["radio_table"])}])
         return httpx.Response(404, json={"message": f"unexpected {request.method} {path}"})
 
@@ -106,3 +109,15 @@ async def test_no_change_and_writes_disabled():
 async def test_not_an_ap_is_an_error():
     with pytest.raises(ToolError, match="no access point matches"):
         await call(make(FakeConsole()), "list_ap_radios", device="Downstairs Switch", **ARGS)
+
+
+async def test_falls_back_to_stat_device_when_rest_get_is_404():
+    fake = FakeConsole()
+    fake.rest_get_404 = True
+    listed = await call(make(fake), "list_ap_radios", device="Downstairs Sales U7 Pro", **ARGS)
+    assert {r["band_ghz"] for r in listed["radios"]} == {"2.4", "5", "6"}
+    done = await call(make(fake), "set_ap_radios", device="Downstairs Sales U7 Pro", confirm=True,
+                      radios=[{"band": 2.4, "tx_power": "low"}], **ARGS)
+    assert done["executed"] is True
+    table = {r["radio"]: r for r in fake.puts[0]["radio_table"]}
+    assert table["ng"]["tx_power_mode"] == "low" and table["na"] == RADIO_TABLE[1]

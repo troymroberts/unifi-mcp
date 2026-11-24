@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from .client import NETWORK_LEGACY_APP, NetworkAPI, NetworkTarget
+from .client import NETWORK_LEGACY_APP, NetworkAPI, NetworkTarget, UniFiAPIError
 from .config import Settings
 from .locate import normalize_mac
 from .resolve import Resolver
@@ -81,7 +81,12 @@ class APRadios:
     async def _ap(self, target: NetworkTarget, site_ref: str, device: str) -> tuple[dict[str, Any], dict[str, Any]]:
         """(stat/device record for live stats, stored rest/device config for writing)."""
         stat = self._find_ap(await self._legacy(target, site_ref, "GET", "/stat/device"), device)
-        stored = await self._legacy(target, site_ref, "GET", f"/rest/device/{stat['_id']}")
+        try:
+            stored = await self._legacy(target, site_ref, "GET", f"/rest/device/{stat['_id']}")
+        except UniFiAPIError as exc:
+            if exc.status not in (400, 404, 405):
+                raise
+            stored = []  # some controllers/Connector paths don't serve GET rest/device/<id>; stat/device has radio_table
         cfg = stored[0] if stored else stat
         if not cfg.get("radio_table"):
             cfg = stat
