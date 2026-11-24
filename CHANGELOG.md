@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.8.1
+- `set_switch_ports` no longer writes `setting_preference`. Live validation showed controllers keep `"auto"` on
+  ordinary ports that carry a manual native VLAN, so the field is not a profile-vs-manual switch; 0.8.0 set
+  `"manual"`/`"auto"` and would have changed an unknown setting. A profile now replaces per-port VLAN fields and
+  manual VLANs drop a profile, without touching `setting_preference`. (`list_switch_ports` verified live.)
+
 ## 0.8.0
 Switch port settings (classic `rest/device` port overrides via the Connector; the Integration API can only
 power-cycle a port).

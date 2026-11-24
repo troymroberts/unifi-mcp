@@ -195,21 +195,21 @@ class SwitchPorts:
                     change["name"] = str(item["name"])[:64]
                 if "profile" in wants:
                     prof = self._pick(ctx["profiles"], item["profile"], "profile")
-                    change.update({"portconf_id": prof["_id"], "setting_preference": "auto"})
+                    change["portconf_id"] = prof["_id"]
+                # setting_preference is never written: live controllers keep "auto" alongside a manual native
+                # VLAN on ordinary ports, so the field does not mean profile-vs-manual and we leave it untouched.
                 if "native_network" in wants:
                     net = self._pick(ctx["networks"], item["native_network"], "network", vlan_ok=True)
-                    change.update({"native_networkconf_id": net["_id"], "setting_preference": "manual"})
+                    change["native_networkconf_id"] = net["_id"]
                 if "tagged" in wants:
                     t = item["tagged"]
                     if isinstance(t, str) and t.lower() in TAGGED_MODES:
-                        change.update({"tagged_vlan_mgmt": TAGGED_MODES[t.lower()], "excluded_networkconf_ids": [],
-                                       "setting_preference": "manual"})
+                        change.update({"tagged_vlan_mgmt": TAGGED_MODES[t.lower()], "excluded_networkconf_ids": []})
                     elif isinstance(t, list):
                         keep = {self._pick(ctx["networks"], x, "network", vlan_ok=True)["_id"] for x in t}
                         native_id = change.get("native_networkconf_id") or by_idx.get(idx, {}).get("native_networkconf_id")
                         excluded = [n["_id"] for n in ctx["networks"] if n["_id"] not in keep and n["_id"] != native_id]
-                        change.update({"tagged_vlan_mgmt": "custom", "excluded_networkconf_ids": excluded,
-                                       "setting_preference": "manual"})
+                        change.update({"tagged_vlan_mgmt": "custom", "excluded_networkconf_ids": excluded})
                     else:
                         raise PortError(f"tagged must be 'all', 'none' or a list of networks, not {t!r}")
                 if "poe_mode" in wants:
@@ -265,9 +265,11 @@ class SwitchPorts:
                 o = {"port_idx": p["port"]}
                 overrides.append(o)
                 by_idx[p["port"]] = o
-            if p["_change"].get("setting_preference") == "auto":
+            if "portconf_id" in p["_change"]:  # a profile replaces per-port VLAN settings
                 for k in ("native_networkconf_id", "tagged_vlan_mgmt", "excluded_networkconf_ids"):
                     o.pop(k, None)
+            elif {"native_networkconf_id", "tagged_vlan_mgmt"} & p["_change"].keys():
+                o.pop("portconf_id", None)  # manual VLANs replace a profile
             o.update(p["_change"])
         await self._legacy(target, site_ref, "PUT", f"/rest/device/{dev['_id']}", {"port_overrides": overrides})
         return {"executed": True, **summary, "applied": [{"port": p["port"], **p["after"]} for p in changes],

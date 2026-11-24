@@ -97,7 +97,7 @@ async def test_native_vlan_change_dry_run_then_apply_keeps_other_overrides():
     by_idx = {o["port_idx"]: o for o in body}
     assert by_idx[4] == {"port_idx": 4, "name": "spare", "poe_mode": "off"}  # untouched
     assert by_idx[2]["native_networkconf_id"] == "net-voip"
-    assert by_idx[2]["setting_preference"] == "manual" and by_idx[2]["name"] == "1576 Christmas Shop"
+    assert "setting_preference" not in by_idx[2] and by_idx[2]["name"] == "1576 Christmas Shop"
 
 
 async def test_refuses_uplink_and_device_port_and_writes_nothing():
@@ -128,7 +128,7 @@ async def test_profile_switches_back_to_auto_and_drops_manual_vlans():
     await call(make(fake), "set_switch_ports", device="dev-sw3", console="Office-UDM", site="Default", confirm=True,
                ports=[{"port": 2, "profile": "Voice phones"}])
     o = {x["port_idx"]: x for x in fake.puts[0][1]["port_overrides"]}[2]
-    assert o["portconf_id"] == "pc-voice" and o["setting_preference"] == "auto"
+    assert o["portconf_id"] == "pc-voice" and "setting_preference" not in o
     assert "native_networkconf_id" not in o
 
 
