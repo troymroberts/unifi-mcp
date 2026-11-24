@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.9.0
+AP radio settings (classic `rest/device` `radio_table` via the Connector; the Integration API can only restart
+an AP).
+- `list_ap_radios`: one AP's radios per band with the stored settings (channel, `ht` width, `tx_power_mode`,
+  `tx_power`) and live values from `stat/device` (channel, tx power dBm, clients, airtime).
+- `set_ap_radios`: per band (2.4/5/6) transmit power (`auto`/`high`/`medium`/`low` or custom dBm 1-30), channel
+  (`auto` or a channel valid for the band) and width (per-band allowed MHz). Writes the AP's full `radio_table`
+  with only the named bands changed; whole batch validated first; the plan shows each radio's stored entry so
+  field names can be checked on a live controller before the first write; dry-run until `confirm=true`, needs
+  `UNIFI_ALLOW_WRITES=true`.
+
 ## 0.8.1
 - `set_switch_ports` no longer writes `setting_preference`. Live validation showed controllers keep `"auto"` on
   ordinary ports that carry a manual native VLAN, so the field is not a profile-vs-manual switch; 0.8.0 set
