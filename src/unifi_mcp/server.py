@@ -17,6 +17,7 @@ from .client import NETWORK_APP, HttpBackend, NetworkAPI, NetworkTarget, SiteMan
 from .config import ConfigError, Settings, load_secrets_file, load_settings
 from .locate import ClientLocator
 from .ports import SwitchPorts
+from .radios import APRadios
 from .reservations import Reservations
 from .resolve import Resolver, ResolveError, host_name
 
@@ -64,6 +65,8 @@ UniFi fleet + Network API access.
   classic API; a console that only answers the Integration API returns a note instead.
 - Switch ports: list_switch_ports(device) -> per-port VLANs/profile/PoE + client MACs; set_switch_ports(device,
   ports=[{port, name?, native_network?, tagged?, profile?, poe_mode?}]) is a gated write (dry-run, then confirm=true).
+- AP radios: list_ap_radios(device) -> stored + live settings per band; set_ap_radios(device, radios=[{band: 2.4|5|6,
+  tx_power?: auto|high|medium|low|<dBm>, channel?: auto|<n>, width?: <MHz>}]) is a gated write (dry-run, then confirm=true).
 - Anything not covered by a curated tool: network_api_endpoints -> network_api_describe -> network_api_request.
 - Protect (cameras/NVR): protect_list_cameras, protect_list_devices, protect_camera_snapshot, protect_events,
   protect_license_plates, protect_api_request. Events and plates use Protect's internal API (cloud Connector).
@@ -202,7 +205,8 @@ def create_server(settings: Settings | None = None, transport: httpx.AsyncBaseTr
     locator = ClientLocator(settings, resolver, network)
     reservations = Reservations(settings, resolver, network)
     switch_ports = SwitchPorts(settings, resolver, network)
-    mcp = MCPServer("unifi", instructions=INSTRUCTIONS, version="0.8.1")
+    ap_radios = APRadios(settings, resolver, network)
+    mcp = MCPServer("unifi", instructions=INSTRUCTIONS, version="0.9.0")
 
     async def fleet() -> tuple[list[dict], list[dict], dict[str, dict]]:
         hosts = await resolver.hosts()
@@ -522,6 +526,27 @@ def create_server(settings: Settings | None = None, transport: httpx.AsyncBaseTr
         changes, and writes nothing if any port has an error. The plan lists clients_affected per port.
         Returns a plan (dry run) until confirm=true; needs UNIFI_ALLOW_WRITES=true to apply."""
         return await switch_ports.set_ports(device, ports, console, site, confirm)
+
+    @mcp.tool(annotations=READ)
+    @_guard
+    async def list_ap_radios(device: str, console: str | None = None, site: str | None = None) -> dict[str, Any]:
+        """One access point's radios (device = name, MAC or id): per band the stored settings (channel, width
+        'ht', tx_power_mode, tx_power) and live values (channel, tx power dBm, clients, airtime). Classic API."""
+        return await ap_radios.list_radios(device, console, site)
+
+    @mcp.tool(annotations=WRITE)
+    @_guard
+    async def set_ap_radios(
+        device: str, radios: list[dict[str, Any]], console: str | None = None, site: str | None = None,
+        confirm: bool = False,
+    ) -> dict[str, Any]:
+        """Change radio settings on one access point (device = name, MAC or id). radios = [{"band": 2.4 | 5 | 6,
+        "tx_power": "auto" | "high" | "medium" | "low" | <dBm 1-30>, "channel": "auto" | <n>, "width": <20/40/80/
+        160/320 MHz>}, ...] (each setting optional). Only the named bands change; the rest of the radio table is
+        written back as stored. Validates channel/width per band and writes nothing if any radio has an error.
+        The plan shows each radio's stored entry so field names can be checked first. Returns a plan (dry run)
+        until confirm=true; needs UNIFI_ALLOW_WRITES=true to apply. The AP re-provisions; clients may reconnect."""
+        return await ap_radios.set_radios(device, radios, console, site, confirm)
 
     @mcp.tool(annotations=READ)
     @_guard

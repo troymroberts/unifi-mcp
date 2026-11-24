@@ -35,6 +35,8 @@ An MCP server for managing UniFi deployments from Claude (or any MCP client).
 | `set_client_reservations` | **Write**: fixed IPs and/or aliases for many clients at once; whole batch validated first; dry-run until `confirm=true` |
 | `list_switch_ports` | One switch's ports: link, name, profile, native/tagged VLANs, PoE, uplink/LAG, downstream UniFi devices and the client MACs on each port |
 | `set_switch_ports` | **Write**: port name, native VLAN, tagged VLANs, port profile, PoE auto/off; refuses uplink/LAG/device-feeding ports; dry-run until `confirm=true` |
+| `list_ap_radios` | One AP's radios per band: stored settings (channel, width, tx power mode/dBm) and live channel, tx power, clients, airtime |
+| `set_ap_radios` | **Write**: per band (2.4/5/6) tx power (auto/high/medium/low or dBm), channel, width; other bands written back as stored; dry-run until `confirm=true` |
 | `list_site_config` | networks, wifi, firewall-policies/zones, acl-rules, dns-policies, wans, vpn-servers/tunnels, vouchers, radius-profiles, device-tags, LAGs, switch stacks, traffic-matching-lists |
 | `network_api_endpoints`, `network_api_describe` | Search the bundled Network API spec; show parameters and request body schema |
 | `network_api_request` | Call any Network API path (GET runs; other methods are gated writes) |
